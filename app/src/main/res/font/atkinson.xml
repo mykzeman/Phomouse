@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<font-family xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Regular -->
+    <font
+        app:font="@font/atkinson_regular"
+        app:fontStyle="normal"
+        app:fontWeight="400" />
+
+    <!-- Italic -->
+    <font
+        app:font="@font/atkinson_italic"
+        app:fontStyle="italic"
+        app:fontWeight="400" />
+
+    <!-- Bold -->
+    <font
+        app:font="@font/atkinson_bold"
+        app:fontStyle="normal"
+        app:fontWeight="700" />
+
+    <!-- Bold Italic -->
+    <font
+        app:font="@font/atkinson_bold_italic"
+        app:fontStyle="italic"
+        app:fontWeight="700" />
+
+</font-family>

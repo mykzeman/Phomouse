@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!--Primary colors-->
+    <color name="primary">#4EB9FD</color>
+    <!--Accent colors-->
+    <color name="accent">#0BFEC8</color>
+    <!--Error colors-->
+    <color name="error">#AB1D26</color>
+    <!--Success colors-->
+    <color name="success">#589B0C</color>
+    <!--Neutral colors-->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 </resources>
