@@ -18,8 +18,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Use the new multi-screen layout
-        setContentView(R.layout.layout)
+        // Set the content view to the organized activity_main layout
+        setContentView(R.layout.activity_main)
 
         viewFlipper = findViewById(R.id.app_view_flipper)
 
@@ -28,7 +28,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupTestingButton() {
-        // This is the button from your original activity_main.xml, now in layout.xml
         val btnConnect = findViewById<Button>(R.id.btnConnect)
         btnConnect.setOnClickListener {
             val bluetoothManager = getSystemService(BluetoothManager::class.java)
