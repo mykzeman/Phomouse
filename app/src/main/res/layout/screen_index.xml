@@ -92,12 +92,16 @@
 
             <!-- Paired Item 1 -->
             <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/item_device_1"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:paddingHorizontal="24dp"
                 android:paddingVertical="24dp"
-                android:background="?attr/selectableItemBackground">
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true">
                 <TextView
+                    android:id="@+id/tv_device_1"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Lorem Ipsum"
@@ -108,7 +112,7 @@
                     app:layout_constraintTop_toTopOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent"/>
                 <ImageButton
-                    android:id="@+id/btn_info_sample"
+                    android:id="@+id/btn_info_1"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
                     android:src="@drawable/ic_info"
@@ -119,47 +123,70 @@
                     app:layout_constraintBottom_toBottomOf="parent"/>
             </androidx.constraintlayout.widget.ConstraintLayout>
 
-            <!-- More Items for visualization -->
+            <!-- Paired Item 2 -->
             <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/item_device_2"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:paddingHorizontal="24dp"
-                android:paddingVertical="24dp">
+                android:paddingVertical="24dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true">
                 <TextView
+                    android:id="@+id/tv_device_2"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Lorem Ipsum"
                     android:textSize="24sp"
                     android:textColor="@color/black"
+                    android:fontFamily="@font/atkinson"
                     app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toTopOf="parent" />
-                <ImageView
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"/>
+                <ImageButton
+                    android:id="@+id/btn_info_2"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
                     android:src="@drawable/ic_info"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Info"
                     app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintTop_toTopOf="parent" />
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"/>
             </androidx.constraintlayout.widget.ConstraintLayout>
 
+            <!-- Paired Item 3 -->
             <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/item_device_3"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:paddingHorizontal="24dp"
-                android:paddingVertical="24dp">
+                android:paddingVertical="24dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true">
                 <TextView
+                    android:id="@+id/tv_device_3"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Lorem Ipsum"
                     android:textSize="24sp"
                     android:textColor="@color/black"
+                    android:fontFamily="@font/atkinson"
                     app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toTopOf="parent" />
-                <ImageView
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"/>
+                <ImageButton
+                    android:id="@+id/btn_info_3"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
                     android:src="@drawable/ic_info"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Info"
                     app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintTop_toTopOf="parent" />
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"/>
             </androidx.constraintlayout.widget.ConstraintLayout>
 
         </LinearLayout>

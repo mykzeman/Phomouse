@@ -4,6 +4,7 @@ import android.bluetooth.BluetoothHidDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
 import android.widget.ImageButton
 import android.widget.TextView
@@ -66,17 +67,34 @@ class MainActivity : AppCompatActivity() {
         findViewById<ImageButton>(R.id.btn_settings_index).setOnClickListener {
             viewFlipper.displayedChild = 4 // Go to Settings
         }
-        // Using the sample item to navigate to Info
-        findViewById<ImageButton>(R.id.btn_info_sample).setOnClickListener {
-            viewFlipper.displayedChild = 3 // Go to Device Info
+
+        // Paired Devices Click Listeners (to Controller)
+        val pairedItemIds = listOf(R.id.item_device_1, R.id.item_device_2, R.id.item_device_3)
+        pairedItemIds.forEach { id ->
+            findViewById<View>(id)?.setOnClickListener {
+                viewFlipper.displayedChild = 2 // Go to Controller
+            }
+        }
+
+        // Information Icon Click Listeners (to Device Info)
+        val infoBtnIds = listOf(R.id.btn_info_1, R.id.btn_info_2, R.id.btn_info_3)
+        infoBtnIds.forEach { id ->
+            findViewById<View>(id)?.setOnClickListener {
+                viewFlipper.displayedChild = 3 // Go to Device Info
+            }
         }
 
         // Navigation from Add Device (Screen 1)
         findViewById<ImageButton>(R.id.btn_home_add).setOnClickListener {
             viewFlipper.displayedChild = 0 // Back Home
         }
-        findViewById<TextView>(R.id.available_device_sample).setOnClickListener {
-            viewFlipper.displayedChild = 2 // Go to Controller
+
+        // Available Devices Click Listeners (to Controller)
+        val availableItemIds = listOf(R.id.available_device_1, R.id.available_device_2, R.id.available_device_3)
+        availableItemIds.forEach { id ->
+            findViewById<View>(id)?.setOnClickListener {
+                viewFlipper.displayedChild = 2 // Go to Controller
+            }
         }
 
         // Navigation from Controller (Screen 2)
