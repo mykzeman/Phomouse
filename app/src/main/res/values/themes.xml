@@ -1,9 +1,15 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Base.Theme.Phomouse" parent="Theme.Material3.DayNight.NoActionBar">
- <item name="colorPrimary">@color/primary</item>
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorAccent">@color/accent</item>
+        <item name="android:windowBackground">@color/white</item>
     </style>
 
     <style name="Theme.Phomouse" parent="Base.Theme.Phomouse" />
+
+    <style name="ShapeAppearance.Phomouse.RoundedFAB" parent="ShapeAppearance.Material3.MediumComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">24dp</item>
+    </style>
 </resources>

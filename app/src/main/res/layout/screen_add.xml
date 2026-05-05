@@ -3,89 +3,112 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/screen_add"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/white">
 
-    <com.google.android.material.appbar.AppBarLayout
-        android:id="@+id/appbar_add"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/header_add"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:padding="16dp"
         app:layout_constraintTop_toTopOf="parent">
 
-        <androidx.appcompat.widget.Toolbar
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            app:contentInsetStart="0dp"
-            app:contentInsetEnd="0dp">
+        <ImageButton
+            android:id="@+id/btn_home_add"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@drawable/ic_home"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-            <androidx.constraintlayout.widget.ConstraintLayout
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:paddingHorizontal="16dp">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ADD\nDEVICE"
+            android:textSize="32sp"
+            android:textStyle="bold"
+            android:textColor="@color/black"
+            android:gravity="center"
+            android:fontFamily="@font/atkinson"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-                <ImageButton
-                    android:id="@+id/btn_home_add"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:src="@drawable/ic_placeholder"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    app:tint="?attr/colorOnPrimary"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toTopOf="parent"
-                    app:layout_constraintBottom_toBottomOf="parent"/>
+        <ImageView
+            android:id="@+id/logo_add"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:src="@drawable/ic_logo"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="ADD DEVICE"
-                    android:textSize="20sp"
-                    android:textStyle="bold"
-                    android:textColor="?attr/colorOnPrimary"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintTop_toTopOf="parent"
-                    app:layout_constraintBottom_toBottomOf="parent"/>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
-                <ImageView
-                    android:id="@+id/logo_add"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:src="@drawable/ic_placeholder"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintTop_toTopOf="parent"
-                    app:layout_constraintBottom_toBottomOf="parent"/>
+    <TextView
+        android:id="@+id/title_available"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Available Devices"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:textColor="@color/black"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="16dp"
+        android:fontFamily="@font/atkinson"
+        app:layout_constraintTop_toBottomOf="@id/header_add" />
 
-            </androidx.constraintlayout.widget.ConstraintLayout>
-        </androidx.appcompat.widget.Toolbar>
-    </com.google.android.material.appbar.AppBarLayout>
+    <View
+        android:id="@+id/divider_add"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/black"
+        app:layout_constraintTop_toBottomOf="@id/title_available" />
 
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        app:layout_constraintTop_toBottomOf="@id/appbar_add"
+        app:layout_constraintTop_toBottomOf="@id/divider_add"
         app:layout_constraintBottom_toBottomOf="parent">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingVertical="8dp">
 
+            <!-- Repeated items for template fidelity -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Available Devices"
+                android:text="Lorem Ipsum"
                 android:textSize="24sp"
-                android:textStyle="bold"
-                android:padding="16dp"/>
+                android:textColor="@color/black"
+                android:paddingHorizontal="24dp"
+                android:paddingVertical="24dp"
+                android:fontFamily="@font/atkinson"
+                android:background="?attr/selectableItemBackground"/>
 
-            <!-- Available Device Items -->
             <TextView
-                android:id="@+id/available_device_sample"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Sample Available Device"
-                android:textSize="18sp"
+                android:text="Lorem Ipsum"
+                android:textSize="24sp"
+                android:textColor="@color/black"
                 android:paddingHorizontal="24dp"
-                android:paddingVertical="16dp"
+                android:paddingVertical="24dp"
+                android:fontFamily="@font/atkinson"
+                android:background="?attr/selectableItemBackground"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Lorem Ipsum"
+                android:textSize="24sp"
+                android:textColor="@color/black"
+                android:paddingHorizontal="24dp"
+                android:paddingVertical="24dp"
+                android:fontFamily="@font/atkinson"
                 android:background="?attr/selectableItemBackground"/>
 
         </LinearLayout>
