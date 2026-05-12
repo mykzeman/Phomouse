@@ -88,7 +88,7 @@ class MainActivity : AppCompatActivity() {
         bindService(intent, connection, Context.BIND_AUTO_CREATE)
     }
 
-    private fun checkPermissions() {
+private fun checkPermissions() {
         val permissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
@@ -118,7 +118,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupNavigation() {
-        findViewById<FloatingActionButton>(R.id.fab_add).setOnClickListener { viewFlipper.displayedChild = 1 }
+        findViewById<FloatingActionButton>(R.id.fab_add).setOnClickListener {
+            viewFlipper.displayedChild = 1 ;
+            mouseService?.sendPublicAdvertise();
+        }
         findViewById<ImageButton>(R.id.btn_settings_index).setOnClickListener { viewFlipper.displayedChild = 4 }
 
         listOf(R.id.item_device_1, R.id.item_device_2, R.id.item_device_3).forEach { id ->

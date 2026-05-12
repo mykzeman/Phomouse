@@ -83,9 +83,7 @@ class MouseService : Service() {
         override fun onAppStatusChanged(pluggedDevice: BluetoothDevice?, registered: Boolean) {
             super.onAppStatusChanged(pluggedDevice, registered)
             Log.d(TAG, "onAppStatusChanged: registered=$registered")
-            if (registered) {
-                startAdvertising()
-            }
+
         }
 
         override fun onConnectionStateChanged(device: BluetoothDevice?, state: Int) {
@@ -94,13 +92,12 @@ class MouseService : Service() {
             if (state == BluetoothProfile.STATE_CONNECTED) {
                 connectedDevice = device
                 stopAdvertising()
-            } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
-                connectedDevice = null
-                startAdvertising()
             }
         }
     }
-
+    public fun sendPublicAdvertise(){
+        startAdvertising()
+    }
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
