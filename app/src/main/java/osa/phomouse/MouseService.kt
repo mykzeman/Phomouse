@@ -95,14 +95,16 @@ class MouseService : Service() {
             }
         }
     }
-    public fun sendPublicAdvertise(){
+    fun sendPublicAdvertise(){
+        setupBluetooth()
         startAdvertising()
+
     }
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, createNotification())
-        setupBluetooth()
+
     }
 
     private fun setupBluetooth() {
