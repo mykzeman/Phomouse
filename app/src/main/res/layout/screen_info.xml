@@ -81,9 +81,10 @@
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintBottom_toBottomOf="parent"/>
             <TextView
+                android:id="@+id/tv_info_device_name"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Lorem Ipsum"
+                android:text="---"
                 android:textSize="24sp"
                 android:textColor="@color/black"
                 android:fontFamily="@font/atkinson"
@@ -108,11 +109,12 @@
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintBottom_toBottomOf="parent"/>
             <TextView
+                android:id="@+id/tv_info_status"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Connected"
+                android:text="Disconnected"
                 android:textSize="24sp"
-                android:textColor="@color/success"
+                android:textColor="@color/error"
                 android:textStyle="bold"
                 android:fontFamily="@font/atkinson"
                 app:layout_constraintEnd_toEndOf="parent"
@@ -137,7 +139,9 @@
             android:orientation="vertical"
             android:gravity="center"
             android:background="?attr/selectableItemBackground"
-            android:padding="16dp">
+            android:padding="16dp"
+            android:clickable="true"
+            android:focusable="true">
             <ImageView
                 android:layout_width="48dp"
                 android:layout_height="48dp"
@@ -161,7 +165,9 @@
             android:orientation="vertical"
             android:gravity="center"
             android:background="?attr/selectableItemBackground"
-            android:padding="16dp">
+            android:padding="16dp"
+            android:clickable="true"
+            android:focusable="true">
             <ImageView
                 android:layout_width="48dp"
                 android:layout_height="48dp"
