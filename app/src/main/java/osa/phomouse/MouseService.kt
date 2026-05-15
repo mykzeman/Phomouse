@@ -4,7 +4,6 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothHidDevice
 import android.bluetooth.BluetoothHidDeviceAppSdpSettings
@@ -15,17 +14,14 @@ import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
 import android.bluetooth.le.BluetoothLeAdvertiser
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.hardware.input.InputManager
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.os.ParcelUuid
 import android.util.Log
-import android.view.InputDevice
 import androidx.core.app.NotificationCompat
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -40,11 +36,10 @@ class MouseService : Service() {
     private var connectedHidDevice: BluetoothDevice? = null
     private var bluetoothLeAdvertiser: BluetoothLeAdvertiser? = null
 
-    // Tracking variable for BT Serial ports (e.g., if any other legacy serial device is used)
+    // Tracking variable for BT Serial ports (Legacy support requirement)
     private val activeSerialConnections = mutableMapOf<String, BluetoothSocket>()
-    
+
     // Persistent tracking of ALL local input devices (Power chair, Joysticks, Mice)
-    // This satisfies the requirement to keep track of connected devices in a variable.
     private val connectedLocalInputDevices = mutableListOf<InputDeviceInfo>()
 
     data class InputDeviceInfo(val id: Int, val name: String, val sources: Int, val descriptor: String)
@@ -110,31 +105,28 @@ class MouseService : Service() {
             } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
                 connectedHidDevice = null
                 startAdvertising() // Automatically restart advertising to allow re-pairing
-                // PERSISTENCE: Notice we do NOT close any serial ports or disconnect local inputs here.
             }
         }
     }
 
-    private val inputDeviceReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            updateInputDevicesList()
-        }
+    // Modern way to track input device changes instead of BroadcastReceiver
+    private val inputDeviceListener = object : InputManager.InputDeviceListener {
+        override fun onInputDeviceAdded(deviceId: Int) = updateInputDevicesList()
+        override fun onInputDeviceRemoved(deviceId: Int) = updateInputDevicesList()
+        override fun onInputDeviceChanged(deviceId: Int) = updateInputDevicesList()
     }
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, createNotification())
-        
+
         setupBluetooth()
         updateInputDevicesList()
-        
-        val filter = IntentFilter().apply {
-            addAction(InputManager.ACTION_INPUT_DEVICE_ADDED)
-            addAction(InputManager.ACTION_INPUT_DEVICE_REMOVED)
-            addAction(InputManager.ACTION_INPUT_DEVICE_CHANGED)
-        }
-        registerReceiver(inputDeviceReceiver, filter)
+
+        // Register input device listener
+        val im = getSystemService(Context.INPUT_SERVICE) as InputManager
+        im.registerInputDeviceListener(inputDeviceListener, null)
     }
 
     private fun setupBluetooth() {
@@ -170,12 +162,6 @@ class MouseService : Service() {
         } catch (e: SecurityException) {
             Log.e(TAG, "registerApp failed", e)
         }
-    }
-
-    fun sendPublicAdvertise(){
-        // Ensure app is registered before advertising
-        if (bluetoothHidDevice == null) setupBluetooth()
-        startAdvertising()
     }
 
     fun startAdvertising() {
@@ -226,7 +212,6 @@ class MouseService : Service() {
         }
     }
 
-    // Connect logic for legacy BT Serial (SPP) if needed
     fun connectSerialDevice(device: BluetoothDevice) {
         if (activeSerialConnections.containsKey(device.address)) return
         Executors.newSingleThreadExecutor().execute {
@@ -243,7 +228,8 @@ class MouseService : Service() {
 
     private fun updateInputDevicesList() {
         val im = getSystemService(Context.INPUT_SERVICE) as InputManager
-        val devices = im.inputDeviceIds.mapNotNull { id ->
+        // Convert IntArray to List to use mapNotNull
+        val devices = im.inputDeviceIds.toList().mapNotNull { id ->
             im.getInputDevice(id)?.let { InputDeviceInfo(id, it.name, it.sources, it.descriptor) }
         }
         connectedLocalInputDevices.clear()
@@ -257,7 +243,7 @@ class MouseService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val serviceChannel = NotificationChannel(CHANNEL_ID, "Phomouse Background Service", NotificationManager.IMPORTANCE_LOW)
             val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(serviceChannel)
+            manager?.createNotificationChannel(serviceChannel)
         }
     }
 
@@ -271,9 +257,12 @@ class MouseService : Service() {
     }
 
     override fun onDestroy() {
-        unregisterReceiver(inputDeviceReceiver)
+        val im = getSystemService(Context.INPUT_SERVICE) as InputManager
+        im.unregisterInputDeviceListener(inputDeviceListener)
+
         stopAdvertising()
         try { bluetoothHidDevice?.unregisterApp() } catch (e: Exception) {}
+
         // Cleanup serial ports only when the service is fully stopped
         activeSerialConnections.values.forEach { try { it.close() } catch (e: Exception) {} }
         activeSerialConnections.clear()
