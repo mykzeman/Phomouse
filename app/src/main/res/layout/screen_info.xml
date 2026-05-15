@@ -30,7 +30,7 @@
             android:textStyle="bold"
             android:textColor="@color/black"
             android:gravity="center"
-            android:fontFamily="@font/atkinson"
+            android:fontFamily="?attr/mainFontFamily"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -76,7 +76,7 @@
                 android:text="Device Name"
                 android:textSize="24sp"
                 android:textColor="@color/black"
-                android:fontFamily="@font/atkinson"
+                android:fontFamily="?attr/mainFontFamily"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintBottom_toBottomOf="parent"/>
@@ -87,7 +87,7 @@
                 android:text="---"
                 android:textSize="24sp"
                 android:textColor="@color/black"
-                android:fontFamily="@font/atkinson"
+                android:fontFamily="?attr/mainFontFamily"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintBottom_toBottomOf="parent"/>
@@ -104,7 +104,7 @@
                 android:text="Connection Status"
                 android:textSize="24sp"
                 android:textColor="@color/black"
-                android:fontFamily="@font/atkinson"
+                android:fontFamily="?attr/mainFontFamily"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintBottom_toBottomOf="parent"/>
@@ -116,7 +116,7 @@
                 android:textSize="24sp"
                 android:textColor="@color/error"
                 android:textStyle="bold"
-                android:fontFamily="@font/atkinson"
+                android:fontFamily="?attr/mainFontFamily"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintBottom_toBottomOf="parent"/>
@@ -154,7 +154,7 @@
                 android:textAlignment="center"
                 android:textSize="18sp"
                 android:textColor="@color/black"
-                android:fontFamily="@font/atkinson"/>
+                android:fontFamily="?attr/mainFontFamily"/>
         </LinearLayout>
 
         <LinearLayout
@@ -180,7 +180,7 @@
                 android:textColor="@color/error"
                 android:textAlignment="center"
                 android:textSize="18sp"
-                android:fontFamily="@font/atkinson"/>
+                android:fontFamily="?attr/mainFontFamily"/>
         </LinearLayout>
 
     </LinearLayout>

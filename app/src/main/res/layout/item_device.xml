@@ -16,7 +16,7 @@
         android:text="Device Name"
         android:textSize="24sp"
         android:textColor="@color/black"
-        android:fontFamily="@font/atkinson"
+        android:fontFamily="?attr/mainFontFamily"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toStartOf="@id/btn_device_info"
         app:layout_constraintTop_toTopOf="parent"

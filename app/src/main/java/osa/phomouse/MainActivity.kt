@@ -100,6 +100,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        prefs = getSharedPreferences("PhomousePrefs", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("dyslexic_mode", false)) {
+            setTheme(R.style.Theme_Phomouse_Dyslexic)
+        } else {
+            setTheme(R.style.Theme_Phomouse)
+        }
+        
         super.onCreate(savedInstanceState)
         
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
@@ -110,7 +117,6 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_main)
         viewFlipper = findViewById(R.id.app_view_flipper)
-        prefs = getSharedPreferences("PhomousePrefs", Context.MODE_PRIVATE)
 
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
@@ -167,8 +173,6 @@ class MainActivity : AppCompatActivity() {
     private fun showDeviceInfo(device: DeviceItem) {
         findViewById<TextView>(R.id.tv_info_device_name).text = device.name
         val statusText = findViewById<TextView>(R.id.tv_info_status)
-        // Check if this device is the one currently connected in MouseService
-        // (This would require a check in MouseService)
         statusText.text = if (device.isPaired) "Paired" else "Available"
         statusText.setTextColor(if (device.isPaired) ContextCompat.getColor(this, R.color.success) else ContextCompat.getColor(this, R.color.error))
         viewFlipper.displayedChild = 3
@@ -291,7 +295,10 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<SwitchCompat>(R.id.switch_dyslexic).apply {
             isChecked = prefs.getBoolean("dyslexic_mode", false)
-            setOnCheckedChangeListener { _, isChecked -> prefs.edit().putBoolean("dyslexic_mode", isChecked).apply() }
+            setOnCheckedChangeListener { _, isChecked -> 
+                prefs.edit().putBoolean("dyslexic_mode", isChecked).apply()
+                recreate()
+            }
         }
 
         findViewById<SwitchCompat>(R.id.switch_colourblind).apply {
@@ -374,12 +381,10 @@ class MainActivity : AppCompatActivity() {
                 dx = event.getAxisValue(MotionEvent.AXIS_X)
                 dy = event.getAxisValue(MotionEvent.AXIS_Y)
             } else {
-                // For mouse, we might want relative move
                 dx = event.getAxisValue(MotionEvent.AXIS_RELATIVE_X)
                 dy = event.getAxisValue(MotionEvent.AXIS_RELATIVE_Y)
-                // If relative axes are not supported, fallback to regular X/Y (though harder to calculate delta)
                 if (dx == 0f && dy == 0f) {
-                    dx = event.getAxisValue(MotionEvent.AXIS_X) / 10f // Scale down
+                    dx = event.getAxisValue(MotionEvent.AXIS_X) / 10f
                     dy = event.getAxisValue(MotionEvent.AXIS_Y) / 10f
                 }
             }

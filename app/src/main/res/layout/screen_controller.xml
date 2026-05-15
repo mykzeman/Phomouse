@@ -29,7 +29,7 @@
             android:textSize="32sp"
             android:textStyle="bold"
             android:textColor="@color/black"
-            android:fontFamily="@font/atkinson"
+            android:fontFamily="?attr/mainFontFamily"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -55,7 +55,7 @@
         android:background="@color/accent"
         android:gravity="center"
         android:paddingVertical="24dp"
-        android:fontFamily="@font/atkinson"
+        android:fontFamily="?attr/mainFontFamily"
         app:layout_constraintTop_toBottomOf="@id/header_controller" />
 
     <ScrollView

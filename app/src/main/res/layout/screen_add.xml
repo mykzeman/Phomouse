@@ -30,7 +30,7 @@
             android:textStyle="bold"
             android:textColor="@color/black"
             android:gravity="center"
-            android:fontFamily="@font/atkinson"
+            android:fontFamily="?attr/mainFontFamily"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -55,14 +55,14 @@
         android:textColor="@color/black"
         android:paddingHorizontal="24dp"
         android:paddingVertical="16dp"
-        android:fontFamily="@font/atkinson"
+        android:fontFamily="?attr/mainFontFamily"
         app:layout_constraintTop_toBottomOf="@id/header_add" />
 
     <View
         android:id="@+id/divider_add"
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        background="@color/black"
+        android:background="@color/black"
         app:layout_constraintTop_toBottomOf="@id/title_available" />
 
     <androidx.recyclerview.widget.RecyclerView
