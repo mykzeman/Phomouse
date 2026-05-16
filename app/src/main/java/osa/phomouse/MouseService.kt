@@ -18,15 +18,20 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.hardware.input.InputManager
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.os.ParcelUuid
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import java.io.IOException
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class MouseService : Service() {
 
@@ -38,12 +43,15 @@ class MouseService : Service() {
     private var connectedHidDevice: BluetoothDevice? = null
     private var bluetoothLeAdvertiser: BluetoothLeAdvertiser? = null
 
-    // REQUIREMENT 2: Persistent tracking for auto-reconnect
-    private val desiredSerialAddresses = mutableSetOf<String>()
-    private val activeSerialConnections = mutableMapOf<String, BluetoothSocket>()
+    private lateinit var servicePrefs: SharedPreferences
+    private val desiredSerialAddresses = ConcurrentHashMap.newKeySet<String>()
+    private val activeSerialConnections = ConcurrentHashMap<String, BluetoothSocket>()
+    private val connectingAddresses = ConcurrentHashMap.newKeySet<String>()
     
-    // Persistent tracking of local input devices
+    private val connectionExecutor = Executors.newCachedThreadPool()
     private val connectedLocalInputDevices = mutableListOf<InputDeviceInfo>()
+    
+    private var wakeLock: PowerManager.WakeLock? = null
 
     data class InputDeviceInfo(val id: Int, val name: String, val sources: Int, val descriptor: String)
 
@@ -74,6 +82,7 @@ class MouseService : Service() {
     private val hidDeviceCallback = object : BluetoothHidDevice.Callback() {
         override fun onConnectionStateChanged(device: BluetoothDevice?, state: Int) {
             super.onConnectionStateChanged(device, state)
+            Log.d(tag, "HID Connection state changed: $state")
             if (state == BluetoothProfile.STATE_CONNECTED) {
                 connectedHidDevice = device
                 stopAdvertising()
@@ -81,7 +90,6 @@ class MouseService : Service() {
                 connectedHidDevice = null
                 startAdvertising()
             }
-            // REQUIREMENT 2: PC connection drops explicitly DO NOT close local connections.
         }
     }
 
@@ -95,10 +103,11 @@ class MouseService : Service() {
             } ?: return
 
             if (intent.action == BluetoothDevice.ACTION_ACL_DISCONNECTED) {
-                activeSerialConnections.remove(device.address)
-                // REQUIREMENT 2: Auto-reconnect if it's a desired serial device
                 if (desiredSerialAddresses.contains(device.address)) {
-                    Log.d(tag, "Local serial device ${device.address} lost. Auto-reconnecting...")
+                    Log.d(tag, "Local serial device ${device.address} lost. Scheduling reconnect...")
+                    activeSerialConnections.remove(device.address)?.let {
+                        try { it.close() } catch (e: Exception) {}
+                    }
                     performSerialConnect(device)
                 }
             }
@@ -111,15 +120,31 @@ class MouseService : Service() {
         override fun onInputDeviceChanged(deviceId: Int) = updateInputDevicesList()
     }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        return START_STICKY
+    }
+
     override fun onCreate() {
         super.onCreate()
+        Log.d(tag, "Service Creating...")
         createNotificationChannel()
         startForeground(notificationId, createNotification())
+        
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Phomouse:ServiceWakeLock")
+        wakeLock?.acquire()
+
+        servicePrefs = getSharedPreferences("MouseServicePrefs", MODE_PRIVATE)
+        val saved = servicePrefs.getStringSet("desired_serial_addresses", emptySet())
+        desiredSerialAddresses.addAll(saved ?: emptySet())
+        
         setupBluetooth()
         updateInputDevicesList()
+        reconnectAllSerial()
         
         getSystemService(InputManager::class.java)?.registerInputDeviceListener(inputDeviceListener, null)
-        registerReceiver(bluetoothReceiver, IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED))
+        val filter = IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+        registerReceiver(bluetoothReceiver, filter)
     }
 
     private fun setupBluetooth() {
@@ -155,7 +180,7 @@ class MouseService : Service() {
     fun startAdvertising() {
         val advertiser = bluetoothLeAdvertiser ?: return
         val settings = AdvertiseSettings.Builder()
-            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED) // Safer for concurrent connections
             .setConnectable(true)
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
             .build()
@@ -168,13 +193,8 @@ class MouseService : Service() {
     }
 
     private val advertiseCallback = object : AdvertiseCallback() {
-        override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
-            Log.d(tag, "ADV success")
-        }
-
-        override fun onStartFailure(errorCode: Int) {
-            Log.e(tag, "ADV fail: $errorCode")
-        }
+        override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) { Log.d(tag, "ADV success") }
+        override fun onStartFailure(errorCode: Int) { Log.e(tag, "ADV fail: $errorCode") }
     }
 
     fun sendMouseReport(buttons: Byte, dx: Byte, dy: Byte, wheel: Byte) {
@@ -183,19 +203,91 @@ class MouseService : Service() {
     }
 
     fun connectSerialDevice(device: BluetoothDevice) {
-        desiredSerialAddresses.add(device.address)
+        if (!desiredSerialAddresses.contains(device.address)) {
+            desiredSerialAddresses.add(device.address)
+            saveDesiredAddresses()
+        }
         performSerialConnect(device)
     }
 
-    private fun performSerialConnect(device: BluetoothDevice) {
-        if (activeSerialConnections.containsKey(device.address)) return
-        Executors.newSingleThreadExecutor().execute {
+    fun forgetSerialDevice(address: String) {
+        desiredSerialAddresses.remove(address)
+        saveDesiredAddresses()
+        activeSerialConnections.remove(address)?.let {
+            try { it.close() } catch (e: Exception) {}
+        }
+    }
+
+    private fun saveDesiredAddresses() {
+        servicePrefs.edit().putStringSet("desired_serial_addresses", desiredSerialAddresses.toSet()).apply()
+    }
+
+    private fun reconnectAllSerial() {
+        val adapter = (getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter ?: return
+        desiredSerialAddresses.forEach { address ->
             try {
-                val socket = device.createRfcommSocketToServiceRecord(sppUuid)
-                socket.connect()
-                activeSerialConnections[device.address] = socket
-                Log.d(tag, "Connected to serial device: ${device.address}")
-            } catch (e: Exception) { Log.e(tag, "Serial connect fail", e) }
+                val device = adapter.getRemoteDevice(address)
+                performSerialConnect(device)
+            } catch (e: Exception) { Log.e(tag, "Reconnect failed for $address", e) }
+        }
+    }
+
+    private fun performSerialConnect(device: BluetoothDevice) {
+        if (activeSerialConnections.containsKey(device.address) || connectingAddresses.contains(device.address)) {
+            Log.d(tag, "Connection already active or in progress for ${device.address}")
+            return
+        }
+        connectingAddresses.add(device.address)
+        connectionExecutor.execute {
+            var backoffMs = 2000L
+            try {
+                while (desiredSerialAddresses.contains(device.address) && !activeSerialConnections.containsKey(device.address)) {
+                    try {
+                        Log.d(tag, "Attempting serial connect to ${device.address}...")
+                        val socket = device.createRfcommSocketToServiceRecord(sppUuid)
+                        socket.connect()
+                        activeSerialConnections[device.address] = socket
+                        Log.d(tag, "Connected to serial device: ${device.address}")
+                        startSerialReader(device.address, socket)
+                        break
+                    } catch (e: Exception) {
+                        Log.e(tag, "Serial connect fail for ${device.address}: ${e.message}")
+                        try { 
+                            TimeUnit.MILLISECONDS.sleep(backoffMs)
+                            backoffMs = (backoffMs * 1.5).toLong().coerceAtMost(30000L) 
+                        } catch (ie: InterruptedException) { break }
+                    }
+                }
+            } finally {
+                connectingAddresses.remove(device.address)
+            }
+        }
+    }
+
+    private fun startSerialReader(address: String, socket: BluetoothSocket) {
+        connectionExecutor.execute {
+            try {
+                val inputStream = socket.inputStream
+                val buffer = ByteArray(1024)
+                while (activeSerialConnections.containsKey(address)) {
+                    val read = inputStream.read(buffer)
+                    if (read == -1) {
+                        Log.d(tag, "Serial stream EOF for $address")
+                        break
+                    }
+                }
+            } catch (e: IOException) {
+                Log.e(tag, "Serial read IOException for $address: ${e.message}")
+            } finally {
+                activeSerialConnections.remove(address)?.let {
+                    try { it.close() } catch (ex: Exception) {}
+                }
+                if (desiredSerialAddresses.contains(address)) {
+                    Log.d(tag, "Re-initiating connection for $address")
+                    val adapter = (getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
+                    adapter?.getRemoteDevice(address)?.let { performSerialConnect(it) }
+                }
+            }
         }
     }
 
@@ -219,17 +311,24 @@ class MouseService : Service() {
 
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, channelId)
-            .setContentTitle("Phomouse Bridge Active").setContentText("Bridging input to PC.")
-            .setSmallIcon(R.drawable.ic_logo).setPriority(NotificationCompat.PRIORITY_LOW).build()
+            .setContentTitle("Phomouse Bridge Active")
+            .setContentText("Bridging input to PC.")
+            .setSmallIcon(R.drawable.ic_logo)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .build()
     }
 
     override fun onDestroy() {
+        Log.d(tag, "Service Destroying...")
+        wakeLock?.let { if (it.isHeld) it.release() }
         getSystemService(InputManager::class.java)?.unregisterInputDeviceListener(inputDeviceListener)
         try { unregisterReceiver(bluetoothReceiver) } catch (e: Exception) {}
         stopAdvertising()
         try { bluetoothHidDevice?.unregisterApp() } catch (e: Exception) {}
         activeSerialConnections.values.forEach { try { it.close() } catch (e: Exception) {} }
         activeSerialConnections.clear()
+        connectionExecutor.shutdownNow()
         super.onDestroy()
     }
 }

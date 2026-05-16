@@ -2,6 +2,7 @@ package osa.phomouse
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothClass
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
@@ -31,7 +32,6 @@ import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.SeekBar
 import android.widget.TextView
-import android.widget.Toast
 import android.widget.ViewFlipper
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
@@ -193,7 +193,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateStatusBar(deviceName: String?) {
-        findViewById<TextView>(R.id.status_bar).apply {
+        findViewById<TextView>(R.id.status_bar)?.apply {
             text = if (deviceName != null) "Connected to $deviceName" else "Not Connected"
             setBackgroundColor(ContextCompat.getColor(this@MainActivity, if (deviceName != null) R.color.accent else R.color.error))
         }
@@ -212,7 +212,9 @@ class MainActivity : AppCompatActivity() {
             mouseService?.sendPublicAdvertise()
         }
         findViewById<View>(R.id.btn_forget).setOnClickListener {
+            selectedDevice?.let { mouseService?.forgetSerialDevice(it.address) }
             viewFlipper.displayedChild = 0
+            updatePairedDevices()
         }
         findViewById<ImageButton>(R.id.btn_settings_info).setOnClickListener { viewFlipper.displayedChild = 4 }
     }
@@ -220,7 +222,12 @@ class MainActivity : AppCompatActivity() {
     private fun updatePairedDevices() {
         try {
             val pairedDevices = bluetoothAdapter?.bondedDevices
-            val items = pairedDevices?.map { DeviceItem(it.name ?: "Unknown", it.address, true) } ?: emptyList()
+            // REQUIREMENT: Display only PCs/Computers on the paired devices screen
+            val items = pairedDevices?.filter { device ->
+                val bClass = device.bluetoothClass
+                bClass != null && bClass.majorDeviceClass == BluetoothClass.Device.Major.COMPUTER
+            }?.map { DeviceItem(it.name ?: "Unknown", it.address, true) } ?: emptyList()
+            
             pairedAdapter.submitList(items)
         } catch (e: SecurityException) {
             Log.e("MainActivity", "Security error accessing bonded devices", e)
@@ -251,7 +258,11 @@ class MainActivity : AppCompatActivity() {
         findViewById<FloatingActionButton>(R.id.fab_add).setOnClickListener {
             viewFlipper.displayedChild = 1
             availableAdapter.submitList(emptyList())
-            try { bluetoothAdapter?.startDiscovery() } catch (e: SecurityException) {}
+            try { 
+                if (bluetoothAdapter?.isDiscovering == false) {
+                    bluetoothAdapter?.startDiscovery() 
+                }
+            } catch (e: SecurityException) {}
             mouseService?.sendPublicAdvertise()
         }
         findViewById<ImageButton>(R.id.btn_home_add).setOnClickListener { 

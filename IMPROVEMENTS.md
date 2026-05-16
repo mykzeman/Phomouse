@@ -1,29 +1,40 @@
-# Phomouse Improvements & Architecture Updates
+### 1. The Core Contradiction: SPP vs. Standard Android Mouse
+**How to fix it:**
+* **Do not use SPP for the Chair:** If you want the chair to act as a normal mouse for the phone in the background, **let the Android OS handle the connection to the chair**. Remove the power chair from the app's internal "Variable Tracking / Auto-Reconnect" serial logic entirely.
+* Your `MainActivity` Dual Mode Capture (`dispatchGenericMotionEvent`) is actually the perfect setup! When the app is in the foreground, `MainActivity` intercepts the Android mouse movements and sends them to the PC. When the app is in the background, `MainActivity` is paused, it stops intercepting, and the chair goes back to controlling your phone. You don't need SPP for this to work.
 
-This document detail how the app has been updated to meet your specific requirements for a reliable bridge between your input devices (like the power chair joystick) and your PC.
+### 2. The Bluetooth Radio Collision (HID Registration vs. SPP)
+**How to fix it:**
+* **Sequence the Connections:** Never attempt an SPP connection or an auto-reconnect while `registerApp` is firing.
+* Wait for the `onAppStatusChanged()` callback to return `true` (meaning the PC HID profile is fully registered and stable) **before** you allow the `MouseService` to initiate any SPP connections for secondary serial devices.
 
-## 1. Dynamic Device & Connection Management
-- **Dynamic Lists**: The hardcoded "Lorem Ipsum" entries have been removed. The app now uses a `RecyclerView` with a `DeviceAdapter` to show actual Bluetooth devices.
-- **Background Bridge**: The `MouseService` is a **Foreground Service**, ensuring the connection remains active even when the app is in the background.
+### 3. The "Variable Tracking" & Auto-Reconnect Loop
+**How to fix it:**
+* **Implement Exponential Backoff:** If a serial connection drops, do not immediately reconnect. Put the reconnection logic in a separate background thread with a delay (e.g., wait 3 seconds, then 5 seconds, then 10 seconds).
+* Check the socket state properly. Ensure you call `socket.close()` on the dropped connection before trying to instantiate a new `createRfcommSocketToServiceRecord`.
 
-## 2. Input Persistence & Tracking
-- **Device Tracking**: Added a `connectedLocalInputDevices` variable in `MouseService`. It uses the Android `InputManager` to track all mice, joysticks, and other input devices currently connected to your phone.
-- **Connection Isolation**: The logic for the PC connection (HID) is completely separated from the local input connections (Serial/Mouse). 
-    - **No Accidental Closures**: When the phone disconnects from the PC, or during the Bluetooth advertising and registration phases, the app **explicitly avoids** closing any active serial ports or disconnecting local input devices.
-    - **Variable Tracking**: The state of these connections is maintained in the `activeSerialConnections` map and `connectedLocalInputDevices` list, ensuring you can monitor them at any time.
+### 4. Background Service Constraints
+**How to fix it:**
+* **Threading:** Ensure your `connectSerialDevice` runs inside a standard Java `Thread`, `ExecutorService`, or Kotlin `Coroutine` (using `Dispatchers.IO`).
+* **Permissions Check:** Ensure your app has `BLUETOOTH_CONNECT` and `BLUETOOTH_SCAN`. More importantly, ensure your Foreground Service in the `AndroidManifest.xml` includes `foregroundServiceType="connectedDevice"`.
 
-## 3. Power Chair Joystick Support
-- **Dual Mode Capture**: The `MainActivity` now captures both `SOURCE_JOYSTICK` and `SOURCE_MOUSE` events. This ensures that if your power chair acts as a standard Android mouse, its movements and button clicks are still captured and bridged to the PC.
-- **Serial (SPP) Support**: The `MouseService` includes a `connectSerialDevice` method using the standard SPP UUID, ready for devices that require a raw serial connection.
+### Summary of the Corrected Architecture
+To achieve your exact requirements safely, your app flow should look like this:
 
-## 4. Settings & Accessibility Implementation
-All options from `screen_settings.xml` are now functional:
-- **Joystick Mode**: Toggle to enable/disable the input bridge.
-- **Dwell Period**: Configurable delay (in ms) to perform a left-click automatically after movement stops (perfect for hands-free operation).
-- **Scroll Amount**: Configurable sensitivity for scroll wheel actions.
-- **UI Scale & Action Sensitivity**: Wired to the control logic and saved in `SharedPreferences`.
-- **Accessibility**: State persistence for **Dyslexic** and **Colourblind** modes is implemented, ready for UI theme adjustments.
-
-## 5. Reliability
-- **Throttling**: Mouse reports are limited to 100 per second (10ms) to ensure smooth movement on the PC without lag or Bluetooth congestion.
-- **Battery Safety**: The app requests to be excluded from battery optimizations to prevent Android from sleeping the connection.
+1. **Bluetooth Setup Phase:**
+    * The app launches. The Foreground Service starts.
+    * The phone's Bluetooth connects to the PC via `BluetoothHidDevice.registerApp()`.
+    * **Wait** for the success callback. Do not attempt any other Bluetooth operations yet.
+2. **Local Input Phase:**
+    * **Power Chair (HID):** Handled entirely by the Android OS. It connects as a standard mouse. Your app does *not* try to connect to it via code.
+    * **Other Serial Devices (SPP):** If you have *other* hardware that strictly uses SPP, the Foreground Service now spins up an IO thread to connect them using `connectSerialDevice` and exponential backoff.
+3. **Control Phase (Foreground):**
+    * You open the app. `MainActivity` is on screen.
+    * You move the power chair joystick. Android receives this natively. `MainActivity.dispatchGenericMotionEvent` intercepts the movement.
+    * `MainActivity` applies your **UI Scale**, **Action Sensitivity**, and **Scroll Amount** preferences.
+    * It throttles the data to 10ms (100 reports/sec) and shoots it over the PC HID connection.
+    * Movement stops. The **Dwell Period** timer starts. Once elapsed, it fires a click to the PC.
+4. **Phone Control Phase (Background):**
+    * You press the home button. `MainActivity` is paused.
+    * The PC connection remains alive in the Foreground Service.
+    * Because `MainActivity` is no longer intercepting inputs, the power chair acts as a standard Android mouse, allowing you to use your phone's apps natively.
