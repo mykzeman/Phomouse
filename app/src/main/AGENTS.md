@@ -17,3 +17,8 @@ fix all the errors in my project . If it is not going to work, explain why and h
     * You press the home button. `MainActivity` is paused.
     * The PC connection remains alive in the Foreground Service.
     * Because `MainActivity` is no longer intercepting inputs, the power chair acts as a standard Android mouse, allowing you to use your phone's apps natively.
+
+
+---
+
+Remove unnecessary permissions and read `IMPROVEMENTS.md` for other necessary context.

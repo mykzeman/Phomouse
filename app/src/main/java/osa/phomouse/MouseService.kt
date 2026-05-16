@@ -42,6 +42,7 @@ class MouseService : Service() {
     private var bluetoothHidDevice: BluetoothHidDevice? = null
     private var connectedHidDevice: BluetoothDevice? = null
     private var bluetoothLeAdvertiser: BluetoothLeAdvertiser? = null
+    private var isHidAppRegistered = false
 
     private lateinit var servicePrefs: SharedPreferences
     private val desiredSerialAddresses = ConcurrentHashMap.newKeySet<String>()
@@ -80,6 +81,16 @@ class MouseService : Service() {
     )
 
     private val hidDeviceCallback = object : BluetoothHidDevice.Callback() {
+        override fun onAppStatusChanged(registered: Boolean) {
+            super.onAppStatusChanged(registered)
+            isHidAppRegistered = registered
+            Log.d(tag, "HID App registration status: $registered")
+            if (registered) {
+                // Now safe to initiate SPP connections
+                reconnectAllSerial()
+            }
+        }
+
         override fun onConnectionStateChanged(device: BluetoothDevice?, state: Int) {
             super.onConnectionStateChanged(device, state)
             Log.d(tag, "HID Connection state changed: $state")
@@ -140,7 +151,7 @@ class MouseService : Service() {
         
         setupBluetooth()
         updateInputDevicesList()
-        reconnectAllSerial()
+        // reconnectAllSerial() - Moved to onAppStatusChanged(true)
         
         getSystemService(InputManager::class.java)?.registerInputDeviceListener(inputDeviceListener, null)
         val filter = IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED)
@@ -159,7 +170,10 @@ class MouseService : Service() {
                 }
             }
             override fun onServiceDisconnected(profile: Int) {
-                if (profile == BluetoothProfile.HID_DEVICE) bluetoothHidDevice = null
+                if (profile == BluetoothProfile.HID_DEVICE) {
+                    bluetoothHidDevice = null
+                    isHidAppRegistered = false
+                }
             }
         }, BluetoothProfile.HID_DEVICE)
     }
@@ -180,7 +194,7 @@ class MouseService : Service() {
     fun startAdvertising() {
         val advertiser = bluetoothLeAdvertiser ?: return
         val settings = AdvertiseSettings.Builder()
-            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED) // Safer for concurrent connections
+            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
             .setConnectable(true)
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
             .build()
@@ -207,7 +221,11 @@ class MouseService : Service() {
             desiredSerialAddresses.add(device.address)
             saveDesiredAddresses()
         }
-        performSerialConnect(device)
+        if (isHidAppRegistered) {
+            performSerialConnect(device)
+        } else {
+            Log.w(tag, "Delaying SPP connect to ${device.address} until HID app is registered.")
+        }
     }
 
     fun forgetSerialDevice(address: String) {
@@ -223,6 +241,7 @@ class MouseService : Service() {
     }
 
     private fun reconnectAllSerial() {
+        if (!isHidAppRegistered) return
         val adapter = (getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter ?: return
         desiredSerialAddresses.forEach { address ->
             try {
@@ -239,12 +258,13 @@ class MouseService : Service() {
         }
         connectingAddresses.add(device.address)
         connectionExecutor.execute {
-            var backoffMs = 2000L
+            var backoffMs = 3000L // Start with 3 seconds as per IMPROVEMENTS.md
             try {
                 while (desiredSerialAddresses.contains(device.address) && !activeSerialConnections.containsKey(device.address)) {
+                    var socket: BluetoothSocket? = null
                     try {
                         Log.d(tag, "Attempting serial connect to ${device.address}...")
-                        val socket = device.createRfcommSocketToServiceRecord(sppUuid)
+                        socket = device.createRfcommSocketToServiceRecord(sppUuid)
                         socket.connect()
                         activeSerialConnections[device.address] = socket
                         Log.d(tag, "Connected to serial device: ${device.address}")
@@ -252,9 +272,15 @@ class MouseService : Service() {
                         break
                     } catch (e: Exception) {
                         Log.e(tag, "Serial connect fail for ${device.address}: ${e.message}")
+                        socket?.let { try { it.close() } catch (ex: Exception) {} }
                         try { 
                             TimeUnit.MILLISECONDS.sleep(backoffMs)
-                            backoffMs = (backoffMs * 1.5).toLong().coerceAtMost(30000L) 
+                            // Exponential backoff
+                            backoffMs = when(backoffMs) {
+                                3000L -> 5000L
+                                5000L -> 10000L
+                                else -> (backoffMs * 1.5).toLong().coerceAtMost(60000L)
+                            }
                         } catch (ie: InterruptedException) { break }
                     }
                 }

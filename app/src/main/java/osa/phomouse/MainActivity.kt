@@ -121,6 +121,8 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         
         viewFlipper = findViewById(R.id.app_view_flipper)
+        applyUiScale(prefs.getInt("ui_scale", 50))
+
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
 
@@ -155,6 +157,12 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+    private fun applyUiScale(scale: Int) {
+        val factor = 0.75f + (scale / 100f) * 0.5f
+        viewFlipper.scaleX = factor
+        viewFlipper.scaleY = factor
+    }
+
     private fun setupRecyclerViews() {
         pairedAdapter = DeviceAdapter(
             onItemClick = { device ->
@@ -177,7 +185,16 @@ class MainActivity : AppCompatActivity() {
                 selectedDevice = deviceItem
                 val bluetoothManager = getSystemService(BluetoothManager::class.java)
                 val device = bluetoothManager?.adapter?.getRemoteDevice(deviceItem.address)
-                device?.let { mouseService?.connectSerialDevice(it) }
+                val bClass = device?.bluetoothClass
+                
+                // ARCHITECTURE FIX: Do not use SPP for the Chair/HID devices.
+                // Let the Android OS handle the connection to the chair.
+                if (bClass != null && (bClass.majorDeviceClass == BluetoothClass.Device.Major.COMPUTER || 
+                                     bClass.majorDeviceClass == BluetoothClass.Device.Major.PERIPHERAL)) {
+                    Log.d("MainActivity", "HID-compatible device selected (${deviceItem.name}) - OS handles this.")
+                } else {
+                    device?.let { mouseService?.connectSerialDevice(it) }
+                }
                 viewFlipper.displayedChild = 2
                 updateStatusBar(deviceItem.name)
             },
@@ -222,7 +239,7 @@ class MainActivity : AppCompatActivity() {
     private fun updatePairedDevices() {
         try {
             val pairedDevices = bluetoothAdapter?.bondedDevices
-            // REQUIREMENT: Display only PCs/Computers on the paired devices screen
+            // Requirement: Only PCs/Computers show in bonded list for bridging
             val items = pairedDevices?.filter { device ->
                 val bClass = device.bluetoothClass
                 bClass != null && bClass.majorDeviceClass == BluetoothClass.Device.Major.COMPUTER
@@ -238,8 +255,9 @@ class MainActivity : AppCompatActivity() {
         val permissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             permissions.addAll(listOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN))
+        } else {
+            permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
         }
-        permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
         val missing = permissions.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isNotEmpty()) ActivityCompat.requestPermissions(this, missing.toTypedArray(), 101)
     }
@@ -331,7 +349,10 @@ class MainActivity : AppCompatActivity() {
         findViewById<SeekBar>(R.id.seekbar_ui_scale).apply {
             progress = prefs.getInt("ui_scale", 50)
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(sb: SeekBar?, p: Int, user: Boolean) { prefs.edit { putInt("ui_scale", p) } }
+                override fun onProgressChanged(sb: SeekBar?, p: Int, user: Boolean) { 
+                    prefs.edit { putInt("ui_scale", p) }
+                    applyUiScale(p)
+                }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
             })
@@ -370,8 +391,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<MaterialButton>(id).setOnClickListener { sendMouseReport(dx.toByte(), dy.toByte()) }
     }
 
-    override fun onGenericMotionEvent(event: MotionEvent): Boolean {
-        if (!prefs.getBoolean("joystick_enabled", true)) return super.onGenericMotionEvent(event)
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        if (!prefs.getBoolean("joystick_enabled", true)) return super.dispatchGenericMotionEvent(event)
+        
         val isJoy = event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
         val isMouse = event.source and InputDevice.SOURCE_MOUSE == InputDevice.SOURCE_MOUSE
 
@@ -406,9 +428,9 @@ class MainActivity : AppCompatActivity() {
                 val dwell = prefs.getInt("dwell_period", 500).toLong()
                 if (dwell > 0) dwellHandler.postDelayed(dwellRunnable, dwell)
             }
-            return true
+            return true // Intercept to bridge to PC
         }
-        return super.onGenericMotionEvent(event)
+        return super.dispatchGenericMotionEvent(event)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
