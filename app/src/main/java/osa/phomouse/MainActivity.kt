@@ -1,19 +1,10 @@
 package osa.phomouse
 
-import android.Manifest
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothClass
-import android.bluetooth.BluetoothDevice
-import android.bluetooth.BluetoothManager
-import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.SharedPreferences
-import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -36,7 +27,6 @@ import android.widget.ViewFlipper
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -65,7 +55,6 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var pairedAdapter: DeviceAdapter
     private lateinit var availableAdapter: DeviceAdapter
-    private var bluetoothAdapter: BluetoothAdapter? = null
 
     private var selectedDevice: DeviceItem? = null
 
@@ -74,38 +63,22 @@ class MainActivity : AppCompatActivity() {
             val binder = service as MouseService.LocalBinder
             mouseService = binder.getService()
             isBound = true
-            updatePairedDevices()
+            
+            mouseService?.onDeviceDiscovered = { deviceName, address ->
+                runOnUiThread {
+                    val newList = availableAdapter.currentList.toMutableList()
+                    if (newList.none { it.address == address }) {
+                        newList.add(DeviceItem(deviceName, address, false))
+                        availableAdapter.submitList(newList)
+                    }
+                }
+            }
+            updateKnownDevices()
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             mouseService = null
             isBound = false
-        }
-    }
-
-    private val receiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == BluetoothDevice.ACTION_FOUND) {
-                val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
-                } else {
-                    @Suppress("DEPRECATION")
-                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
-                }
-                device?.let {
-                    try {
-                        val name = it.name ?: "Unknown Device"
-                        val address = it.address
-                        val newList = availableAdapter.currentList.toMutableList()
-                        if (newList.none { item -> item.address == address }) {
-                            newList.add(DeviceItem(name, address, false))
-                            availableAdapter.submitList(newList)
-                        }
-                    } catch (e: SecurityException) {
-                        Log.e("MainActivity", "Discovery access denied", e)
-                    }
-                }
-            }
         }
     }
 
@@ -123,11 +96,7 @@ class MainActivity : AppCompatActivity() {
         viewFlipper = findViewById(R.id.app_view_flipper)
         applyUiScale(prefs.getInt("ui_scale", 50))
 
-        val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-        bluetoothAdapter = bluetoothManager.adapter
-
         setupRecyclerViews()
-        checkPermissions()
         requestBatteryOptimizations()
         setupNavigation()
         setupControllerButtons()
@@ -141,9 +110,6 @@ class MainActivity : AppCompatActivity() {
             startService(intent)
         }
         bindService(intent, connection, BIND_AUTO_CREATE)
-
-        val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
-        registerReceiver(receiver, filter)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -167,6 +133,7 @@ class MainActivity : AppCompatActivity() {
         pairedAdapter = DeviceAdapter(
             onItemClick = { device ->
                 selectedDevice = device
+                mouseService?.connectToReceiver(device.address)
                 viewFlipper.displayedChild = 2
                 updateStatusBar(device.name)
             },
@@ -183,18 +150,8 @@ class MainActivity : AppCompatActivity() {
         availableAdapter = DeviceAdapter(
             onItemClick = { deviceItem ->
                 selectedDevice = deviceItem
-                val bluetoothManager = getSystemService(BluetoothManager::class.java)
-                val device = bluetoothManager?.adapter?.getRemoteDevice(deviceItem.address)
-                val bClass = device?.bluetoothClass
-                
-                // ARCHITECTURE FIX: Do not use SPP for the Chair/HID devices.
-                // Let the Android OS handle the connection to the chair.
-                if (bClass != null && (bClass.majorDeviceClass == BluetoothClass.Device.Major.COMPUTER || 
-                                     bClass.majorDeviceClass == BluetoothClass.Device.Major.PERIPHERAL)) {
-                    Log.d("MainActivity", "HID-compatible device selected (${deviceItem.name}) - OS handles this.")
-                } else {
-                    device?.let { mouseService?.connectSerialDevice(it) }
-                }
+                mouseService?.connectToReceiver(deviceItem.address)
+                saveKnownDevice(deviceItem)
                 viewFlipper.displayedChild = 2
                 updateStatusBar(deviceItem.name)
             },
@@ -219,7 +176,7 @@ class MainActivity : AppCompatActivity() {
     private fun showDeviceInfo(device: DeviceItem) {
         findViewById<TextView>(R.id.tv_info_device_name).text = device.name
         val statusText = findViewById<TextView>(R.id.tv_info_status)
-        statusText.text = if (device.isPaired) "Paired" else "Available"
+        statusText.text = if (device.isPaired) "Saved" else "Available"
         statusText.setTextColor(ContextCompat.getColor(this, if (device.isPaired) R.color.success else R.color.error))
         viewFlipper.displayedChild = 3
     }
@@ -229,46 +186,47 @@ class MainActivity : AppCompatActivity() {
             mouseService?.sendPublicAdvertise()
         }
         findViewById<View>(R.id.btn_forget).setOnClickListener {
-            selectedDevice?.let { mouseService?.forgetSerialDevice(it.address) }
+            selectedDevice?.let { 
+                mouseService?.forgetSerialDevice(it.address)
+                removeKnownDevice(it.address)
+            }
             viewFlipper.displayedChild = 0
-            updatePairedDevices()
+            updateKnownDevices()
         }
         findViewById<ImageButton>(R.id.btn_settings_info).setOnClickListener { viewFlipper.displayedChild = 4 }
     }
 
-    private fun updatePairedDevices() {
-        try {
-            val pairedDevices = bluetoothAdapter?.bondedDevices
-            // Requirement: Only PCs/Computers show in bonded list for bridging
-            val items = pairedDevices?.filter { device ->
-                val bClass = device.bluetoothClass
-                bClass != null && bClass.majorDeviceClass == BluetoothClass.Device.Major.COMPUTER
-            }?.map { DeviceItem(it.name ?: "Unknown", it.address, true) } ?: emptyList()
-            
-            pairedAdapter.submitList(items)
-        } catch (e: SecurityException) {
-            Log.e("MainActivity", "Security error accessing bonded devices", e)
-        }
+    private fun updateKnownDevices() {
+        val saved = prefs.getStringSet("known_wifi_devices", emptySet()) ?: emptySet()
+        val items = saved.map { 
+            val parts = it.split("|")
+            DeviceItem(parts.getOrElse(0) { "Unknown" }, parts.getOrElse(1) { "" }, true)
+        }.filter { it.address.isNotEmpty() }
+        pairedAdapter.submitList(items)
     }
 
-    private fun checkPermissions() {
-        val permissions = mutableListOf<String>()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            permissions.addAll(listOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN))
-        } else {
-            permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-        val missing = permissions.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
-        if (missing.isNotEmpty()) ActivityCompat.requestPermissions(this, missing.toTypedArray(), 101)
+    private fun saveKnownDevice(device: DeviceItem) {
+        val saved = prefs.getStringSet("known_wifi_devices", emptySet())?.toMutableSet() ?: mutableSetOf()
+        saved.add("${device.name}|${device.address}")
+        prefs.edit { putStringSet("known_wifi_devices", saved) }
+        updateKnownDevices()
+    }
+
+    private fun removeKnownDevice(address: String) {
+        val saved = prefs.getStringSet("known_wifi_devices", emptySet())?.toMutableSet() ?: mutableSetOf()
+        saved.removeAll { it.endsWith("|$address") }
+        prefs.edit { putStringSet("known_wifi_devices", saved) }
     }
 
     private fun requestBatteryOptimizations() {
-        val pm = getSystemService(PowerManager::class.java)
-        if (pm != null && !pm.isIgnoringBatteryOptimizations(packageName)) {
-            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                data = Uri.parse("package:$packageName")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val pm = getSystemService(PowerManager::class.java)
+            if (pm != null && !pm.isIgnoringBatteryOptimizations(packageName)) {
+                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = android.net.Uri.parse("package:$packageName")
+                }
+                try { startActivity(intent) } catch (e: Exception) {}
             }
-            try { startActivity(intent) } catch (e: Exception) {}
         }
     }
 
@@ -276,15 +234,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<FloatingActionButton>(R.id.fab_add).setOnClickListener {
             viewFlipper.displayedChild = 1
             availableAdapter.submitList(emptyList())
-            try { 
-                if (bluetoothAdapter?.isDiscovering == false) {
-                    bluetoothAdapter?.startDiscovery() 
-                }
-            } catch (e: SecurityException) {}
             mouseService?.sendPublicAdvertise()
         }
         findViewById<ImageButton>(R.id.btn_home_add).setOnClickListener { 
-            try { bluetoothAdapter?.cancelDiscovery() } catch (e: SecurityException) {}
             viewFlipper.displayedChild = 0 
         }
         findViewById<ImageButton>(R.id.btn_settings_index).setOnClickListener { viewFlipper.displayedChild = 4 }
@@ -451,7 +403,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        try { unregisterReceiver(receiver) } catch (e: Exception) {}
         if (isBound) { unbindService(connection); isBound = false }
     }
 }
