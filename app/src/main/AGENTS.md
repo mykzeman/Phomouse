@@ -21,4 +21,5 @@ fix all the errors in my project . If it is not going to work, explain why and h
 
 ---
 
-Remove unnecessary permissions and read `IMPROVEMENTS.md` for other necessary context.
+Remove unnecessary permissions and read `IMPROVEMENTS.md` for other necessary context. 
+Make sure that you resolve all potential errors and haven't introduced any new ones.

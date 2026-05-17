@@ -81,8 +81,8 @@ class MouseService : Service() {
     )
 
     private val hidDeviceCallback = object : BluetoothHidDevice.Callback() {
-        override fun onAppStatusChanged(registered: Boolean) {
-            super.onAppStatusChanged(registered)
+        override fun onAppStatusChanged(device: BluetoothDevice?, registered: Boolean) {
+            super.onAppStatusChanged(device, registered)
             isHidAppRegistered = registered
             Log.d(tag, "HID App registration status: $registered")
             if (registered) {
@@ -151,7 +151,6 @@ class MouseService : Service() {
         
         setupBluetooth()
         updateInputDevicesList()
-        // reconnectAllSerial() - Moved to onAppStatusChanged(true)
         
         getSystemService(InputManager::class.java)?.registerInputDeviceListener(inputDeviceListener, null)
         val filter = IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED)
@@ -258,7 +257,7 @@ class MouseService : Service() {
         }
         connectingAddresses.add(device.address)
         connectionExecutor.execute {
-            var backoffMs = 3000L // Start with 3 seconds as per IMPROVEMENTS.md
+            var backoffMs = 3000L
             try {
                 while (desiredSerialAddresses.contains(device.address) && !activeSerialConnections.containsKey(device.address)) {
                     var socket: BluetoothSocket? = null
@@ -275,7 +274,6 @@ class MouseService : Service() {
                         socket?.let { try { it.close() } catch (ex: Exception) {} }
                         try { 
                             TimeUnit.MILLISECONDS.sleep(backoffMs)
-                            // Exponential backoff
                             backoffMs = when(backoffMs) {
                                 3000L -> 5000L
                                 5000L -> 10000L
