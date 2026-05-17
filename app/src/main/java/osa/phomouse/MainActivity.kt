@@ -1,18 +1,10 @@
 package osa.phomouse
 
-import android.Manifest
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothClass
-import android.bluetooth.BluetoothDevice
-import android.bluetooth.BluetoothManager
-import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.SharedPreferences
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -36,76 +28,40 @@ import android.widget.ViewFlipper
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.floatingactionbutton.FloatingActionButton
 import kotlin.math.roundToInt
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var viewFlipper: ViewFlipper
-    private var mouseService: MouseService? = null
+    private var wifiMouseService: WifiMouseService? = null
     private var isBound = false
 
-    private var currentButtons: Byte = 0
+    private var currentButtons: Int = 0
     private var lastReportTime = 0L
-    private val throttleMs = 10L
+    private val throttleMs = 10L // 100Hz as per IMPROVEMENTS.md
 
     private lateinit var prefs: SharedPreferences
     
     private val dwellHandler = Handler(Looper.getMainLooper())
     private var isJoystickMoving = false
     private val dwellRunnable = Runnable {
-        performClick(0x01.toByte()) // Left Click on dwell
+        performLeftClick()
     }
-
-    private lateinit var pairedAdapter: DeviceAdapter
-    private lateinit var availableAdapter: DeviceAdapter
-    private var bluetoothAdapter: BluetoothAdapter? = null
-
-    private var selectedDevice: DeviceItem? = null
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            val binder = service as MouseService.LocalBinder
-            mouseService = binder.getService()
+            val binder = service as WifiMouseService.LocalBinder
+            wifiMouseService = binder.getService()
             isBound = true
-            updatePairedDevices()
+            syncServiceTarget()
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
-            mouseService = null
+            wifiMouseService = null
             isBound = false
-        }
-    }
-
-    private val receiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == BluetoothDevice.ACTION_FOUND) {
-                val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
-                } else {
-                    @Suppress("DEPRECATION")
-                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
-                }
-                device?.let {
-                    try {
-                        val name = it.name ?: "Unknown Device"
-                        val address = it.address
-                        val newList = availableAdapter.currentList.toMutableList()
-                        if (newList.none { item -> item.address == address }) {
-                            newList.add(DeviceItem(name, address, false))
-                            availableAdapter.submitList(newList)
-                        }
-                    } catch (e: SecurityException) {
-                        Log.e("MainActivity", "Discovery access denied", e)
-                    }
-                }
-            }
         }
     }
 
@@ -123,18 +79,12 @@ class MainActivity : AppCompatActivity() {
         viewFlipper = findViewById(R.id.app_view_flipper)
         applyUiScale(prefs.getInt("ui_scale", 50))
 
-        val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-        bluetoothAdapter = bluetoothManager.adapter
-
-        setupRecyclerViews()
-        checkPermissions()
         requestBatteryOptimizations()
         setupNavigation()
         setupControllerButtons()
         setupSettings()
-        setupInfoButtons()
 
-        val intent = Intent(this, MouseService::class.java)
+        val intent = Intent(this, WifiMouseService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent)
         } else {
@@ -142,19 +92,19 @@ class MainActivity : AppCompatActivity() {
         }
         bindService(intent, connection, BIND_AUTO_CREATE)
 
-        val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
-        registerReceiver(receiver, filter)
-
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (viewFlipper.displayedChild != 0) {
                     viewFlipper.displayedChild = 0
+                    updateStatus()
                 } else {
                     isEnabled = false
                     onBackPressedDispatcher.onBackPressed()
                 }
             }
         })
+        
+        updateStatus()
     }
 
     private fun applyUiScale(scale: Int) {
@@ -163,103 +113,27 @@ class MainActivity : AppCompatActivity() {
         viewFlipper.scaleY = factor
     }
 
-    private fun setupRecyclerViews() {
-        pairedAdapter = DeviceAdapter(
-            onItemClick = { device ->
-                selectedDevice = device
-                viewFlipper.displayedChild = 2
-                updateStatusBar(device.name)
-            },
-            onInfoClick = { device ->
-                selectedDevice = device
-                showDeviceInfo(device)
-            }
-        )
-        findViewById<RecyclerView>(R.id.rv_paired_devices).apply {
-            layoutManager = LinearLayoutManager(this@MainActivity)
-            adapter = pairedAdapter
-        }
+    private fun updateStatus() {
+        val ip = prefs.getString("receiver_ip", "")
+        val port = prefs.getInt("receiver_port", 8888)
+        
+        val statusText = if (ip.isNullOrBlank()) "WiFi Target Not Set" else "Target: $ip:$port"
+        val statusColor = if (ip.isNullOrBlank()) R.color.error else R.color.accent
 
-        availableAdapter = DeviceAdapter(
-            onItemClick = { deviceItem ->
-                selectedDevice = deviceItem
-                val bluetoothManager = getSystemService(BluetoothManager::class.java)
-                val device = bluetoothManager?.adapter?.getRemoteDevice(deviceItem.address)
-                val bClass = device?.bluetoothClass
-                
-                // ARCHITECTURE FIX: Do not use SPP for the Chair/HID devices.
-                // Let the Android OS handle the connection to the chair.
-                if (bClass != null && (bClass.majorDeviceClass == BluetoothClass.Device.Major.COMPUTER || 
-                                     bClass.majorDeviceClass == BluetoothClass.Device.Major.PERIPHERAL)) {
-                    Log.d("MainActivity", "HID-compatible device selected (${deviceItem.name}) - OS handles this.")
-                } else {
-                    device?.let { mouseService?.connectSerialDevice(it) }
-                }
-                viewFlipper.displayedChild = 2
-                updateStatusBar(deviceItem.name)
-            },
-            onInfoClick = { device ->
-                selectedDevice = device
-                showDeviceInfo(device)
-            }
-        )
-        findViewById<RecyclerView>(R.id.rv_available_devices).apply {
-            layoutManager = LinearLayoutManager(this@MainActivity)
-            adapter = availableAdapter
-        }
-    }
-
-    private fun updateStatusBar(deviceName: String?) {
         findViewById<TextView>(R.id.status_bar)?.apply {
-            text = if (deviceName != null) "Connected to $deviceName" else "Not Connected"
-            setBackgroundColor(ContextCompat.getColor(this@MainActivity, if (deviceName != null) R.color.accent else R.color.error))
+            text = statusText
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, statusColor))
+        }
+        
+        findViewById<TextView>(R.id.tv_current_target)?.apply {
+            text = if (ip.isNullOrBlank()) "Tap to configure WiFi" else "Sending to $ip:$port"
         }
     }
 
-    private fun showDeviceInfo(device: DeviceItem) {
-        findViewById<TextView>(R.id.tv_info_device_name).text = device.name
-        val statusText = findViewById<TextView>(R.id.tv_info_status)
-        statusText.text = if (device.isPaired) "Paired" else "Available"
-        statusText.setTextColor(ContextCompat.getColor(this, if (device.isPaired) R.color.success else R.color.error))
-        viewFlipper.displayedChild = 3
-    }
-
-    private fun setupInfoButtons() {
-        findViewById<View>(R.id.btn_retry).setOnClickListener {
-            mouseService?.sendPublicAdvertise()
-        }
-        findViewById<View>(R.id.btn_forget).setOnClickListener {
-            selectedDevice?.let { mouseService?.forgetSerialDevice(it.address) }
-            viewFlipper.displayedChild = 0
-            updatePairedDevices()
-        }
-        findViewById<ImageButton>(R.id.btn_settings_info).setOnClickListener { viewFlipper.displayedChild = 4 }
-    }
-
-    private fun updatePairedDevices() {
-        try {
-            val pairedDevices = bluetoothAdapter?.bondedDevices
-            // Requirement: Only PCs/Computers show in bonded list for bridging
-            val items = pairedDevices?.filter { device ->
-                val bClass = device.bluetoothClass
-                bClass != null && bClass.majorDeviceClass == BluetoothClass.Device.Major.COMPUTER
-            }?.map { DeviceItem(it.name ?: "Unknown", it.address, true) } ?: emptyList()
-            
-            pairedAdapter.submitList(items)
-        } catch (e: SecurityException) {
-            Log.e("MainActivity", "Security error accessing bonded devices", e)
-        }
-    }
-
-    private fun checkPermissions() {
-        val permissions = mutableListOf<String>()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            permissions.addAll(listOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN))
-        } else {
-            permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-        val missing = permissions.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
-        if (missing.isNotEmpty()) ActivityCompat.requestPermissions(this, missing.toTypedArray(), 101)
+    private fun syncServiceTarget() {
+        val ip = prefs.getString("receiver_ip", "") ?: ""
+        val port = prefs.getInt("receiver_port", 8888)
+        wifiMouseService?.updateTarget(ip, port)
     }
 
     private fun requestBatteryOptimizations() {
@@ -273,48 +147,48 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupNavigation() {
-        findViewById<FloatingActionButton>(R.id.fab_add).setOnClickListener {
-            viewFlipper.displayedChild = 1
-            availableAdapter.submitList(emptyList())
-            try { 
-                if (bluetoothAdapter?.isDiscovering == false) {
-                    bluetoothAdapter?.startDiscovery() 
-                }
-            } catch (e: SecurityException) {}
-            mouseService?.sendPublicAdvertise()
-        }
-        findViewById<ImageButton>(R.id.btn_home_add).setOnClickListener { 
-            try { bluetoothAdapter?.cancelDiscovery() } catch (e: SecurityException) {}
-            viewFlipper.displayedChild = 0 
+        findViewById<View>(R.id.fab_add).setOnClickListener {
+            viewFlipper.displayedChild = 4 // Settings
         }
         findViewById<ImageButton>(R.id.btn_settings_index).setOnClickListener { viewFlipper.displayedChild = 4 }
         findViewById<ImageButton>(R.id.btn_home_controller).setOnClickListener { viewFlipper.displayedChild = 0 }
         findViewById<ImageButton>(R.id.btn_settings_controller).setOnClickListener { viewFlipper.displayedChild = 4 }
-        findViewById<ImageButton>(R.id.btn_home_info).setOnClickListener { viewFlipper.displayedChild = 0 }
-        findViewById<ImageButton>(R.id.btn_back_settings).setOnClickListener { viewFlipper.displayedChild = 0 }
+        findViewById<ImageButton>(R.id.btn_back_settings).setOnClickListener { 
+            viewFlipper.displayedChild = 0 
+            updateStatus()
+        }
+        
+        findViewById<View>(R.id.rv_paired_devices).setOnClickListener {
+            val ip = prefs.getString("receiver_ip", "")
+            if (ip.isNullOrBlank()) {
+                viewFlipper.displayedChild = 4 // Settings
+            } else {
+                viewFlipper.displayedChild = 2 // Controller
+            }
+        }
     }
 
     private fun setupControllerButtons() {
-        findViewById<MaterialButton>(R.id.btn_left_click).setOnClickListener { performClick(0x01.toByte()) }
-        findViewById<MaterialButton>(R.id.btn_right_click).setOnClickListener { performClick(0x02.toByte()) }
+        findViewById<MaterialButton>(R.id.btn_left_click).setOnClickListener { performLeftClick() }
+        findViewById<MaterialButton>(R.id.btn_right_click).setOnClickListener { performClick(0x02) }
         findViewById<MaterialButton>(R.id.btn_double_click).setOnClickListener {
-            performClick(0x01.toByte())
-            it.postDelayed({ performClick(0x01.toByte()) }, 200)
+            performLeftClick()
+            it.postDelayed({ performLeftClick() }, 200)
         }
         findViewById<MaterialButton>(R.id.btn_scroll_up).setOnClickListener {
-            val amt = prefs.getInt("scroll_amount", 1).toByte()
-            sendMouseReport(wheel = amt)
-            it.postDelayed({ sendMouseReport(wheel = 0) }, 50)
+            val amt = prefs.getInt("scroll_amount", 1)
+            sendMouseReport(scroll = amt)
+            it.postDelayed({ sendMouseReport(scroll = 0) }, 50)
         }
         findViewById<MaterialButton>(R.id.btn_scroll_down).setOnClickListener {
-            val amt = prefs.getInt("scroll_amount", 1).toByte()
-            sendMouseReport(wheel = (-amt).toByte())
-            it.postDelayed({ sendMouseReport(wheel = 0) }, 50)
+            val amt = prefs.getInt("scroll_amount", 1)
+            sendMouseReport(scroll = -amt)
+            it.postDelayed({ sendMouseReport(scroll = 0) }, 50)
         }
         var isGrabbed = false
         findViewById<MaterialButton>(R.id.btn_grab).setOnClickListener {
             isGrabbed = !isGrabbed
-            currentButtons = if (isGrabbed) 0x01.toByte() else 0x00.toByte()
+            currentButtons = if (isGrabbed) 0x01 else 0x00
             sendMouseReport()
             (it as MaterialButton).text = if (isGrabbed) "Release" else "Grab"
         }
@@ -326,6 +200,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupSettings() {
+        findViewById<EditText>(R.id.edit_ip).apply {
+            setText(prefs.getString("receiver_ip", ""))
+            addTextChangedListener(object : TextWatcher {
+                override fun afterTextChanged(s: Editable?) { 
+                    prefs.edit { putString("receiver_ip", s.toString()) }
+                    syncServiceTarget()
+                }
+                override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
+                override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) {}
+            })
+        }
+        findViewById<EditText>(R.id.edit_port).apply {
+            setText(prefs.getInt("receiver_port", 8888).toString())
+            addTextChangedListener(object : TextWatcher {
+                override fun afterTextChanged(s: Editable?) { 
+                    val port = s.toString().toIntOrNull() ?: 8888
+                    prefs.edit { putInt("receiver_port", port) }
+                    syncServiceTarget()
+                }
+                override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
+                override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) {}
+            })
+        }
         findViewById<EditText>(R.id.edit_dwell).apply {
             setText(prefs.getInt("dwell_period", 500).toString())
             addTextChangedListener(createWatcher("dwell_period", 500))
@@ -373,85 +270,102 @@ class MainActivity : AppCompatActivity() {
         override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) {}
     }
 
-    private fun sendMouseReport(dx: Byte = 0, dy: Byte = 0, wheel: Byte = 0) {
+    private fun sendMouseReport(dx: Int = 0, dy: Int = 0, scroll: Int = 0) {
         val now = System.currentTimeMillis()
-        if ((dx != 0.toByte() || dy != 0.toByte()) && now - lastReportTime < throttleMs) return
-        mouseService?.sendMouseReport(currentButtons, dx, dy, wheel)
+        if ((dx != 0 || dy != 0) && now - lastReportTime < throttleMs) return
+        wifiMouseService?.sendMouseReport(dx, dy, scroll, currentButtons)
         lastReportTime = now
     }
 
-    private fun performClick(button: Byte) {
+    private fun performClick(button: Int) {
         val old = currentButtons
-        currentButtons = (currentButtons.toInt() or button.toInt()).toByte()
+        currentButtons = currentButtons or button
         sendMouseReport()
         window.decorView.postDelayed({ currentButtons = old; sendMouseReport() }, 50)
     }
 
+    private fun performLeftClick() {
+        wifiMouseService?.sendMouseReport(0, 0, 0, 1)
+        Handler(Looper.getMainLooper()).postDelayed({
+            wifiMouseService?.sendMouseReport(0, 0, 0, 0)
+        }, 50)
+    }
+
     private fun setupDragButton(id: Int, dx: Int, dy: Int) {
-        findViewById<MaterialButton>(id).setOnClickListener { sendMouseReport(dx.toByte(), dy.toByte()) }
+        findViewById<MaterialButton>(id).setOnClickListener { sendMouseReport(dx, dy) }
     }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
         if (!prefs.getBoolean("joystick_enabled", true)) return super.dispatchGenericMotionEvent(event)
         
-        val isJoy = event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
-        val isMouse = event.source and InputDevice.SOURCE_MOUSE == InputDevice.SOURCE_MOUSE
+        val isMouseOrJoystick = event.source and InputDevice.SOURCE_MOUSE == InputDevice.SOURCE_MOUSE ||
+                                event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
 
-        if ((isJoy || isMouse) && event.action == MotionEvent.ACTION_MOVE) {
-            val sensitivity = (prefs.getInt("sensitivity", 50) + 10) / 60f
-            val dx: Float
-            val dy: Float
-
-            if (isJoy) {
-                dx = event.getAxisValue(MotionEvent.AXIS_X)
-                dy = event.getAxisValue(MotionEvent.AXIS_Y)
-            } else {
-                val relX = event.getAxisValue(MotionEvent.AXIS_RELATIVE_X)
-                val relY = event.getAxisValue(MotionEvent.AXIS_RELATIVE_Y)
-                if (relX == 0f && relY == 0f) {
-                    dx = event.getAxisValue(MotionEvent.AXIS_X) / 10f
-                    dy = event.getAxisValue(MotionEvent.AXIS_Y) / 10f
-                } else {
-                    dx = relX; dy = relY
-                }
-            }
-            
-            val hidX = (dx * 127 * sensitivity).roundToInt().coerceIn(-127, 127).toByte()
-            val hidY = (dy * 127 * sensitivity).roundToInt().coerceIn(-127, 127).toByte()
-            
-            if (hidX != 0.toByte() || hidY != 0.toByte()) {
-                isJoystickMoving = true
-                dwellHandler.removeCallbacks(dwellRunnable)
-                sendMouseReport(hidX, hidY)
-            } else if (isJoystickMoving) {
-                isJoystickMoving = false
-                val dwell = prefs.getInt("dwell_period", 500).toLong()
-                if (dwell > 0) dwellHandler.postDelayed(dwellRunnable, dwell)
-            }
-            return true // Intercept to bridge to PC
+        if (isMouseOrJoystick) {
+            handleChairInput(event)
+            return true 
         }
         return super.dispatchGenericMotionEvent(event)
     }
 
+    private fun handleChairInput(event: MotionEvent) {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastReportTime < throttleMs) return
+        lastReportTime = currentTime
+
+        val sensitivity = (prefs.getInt("sensitivity", 50) + 10) / 60f
+        val uiScaleFactor = 0.75f + (prefs.getInt("ui_scale", 50) / 100f) * 0.5f
+        
+        val dx: Float
+        val dy: Float
+
+        if (event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK) {
+            dx = event.getAxisValue(MotionEvent.AXIS_X)
+            dy = event.getAxisValue(MotionEvent.AXIS_Y)
+        } else {
+            val relX = event.getAxisValue(MotionEvent.AXIS_RELATIVE_X)
+            val relY = event.getAxisValue(MotionEvent.AXIS_RELATIVE_Y)
+            if (relX == 0f && relY == 0f) {
+                dx = event.getAxisValue(MotionEvent.AXIS_X) / 10f
+                dy = event.getAxisValue(MotionEvent.AXIS_Y) / 10f
+            } else {
+                dx = relX; dy = relY
+            }
+        }
+        
+        val hidX = (dx * 127 * sensitivity * uiScaleFactor).roundToInt().coerceIn(-127, 127)
+        val hidY = (dy * 127 * sensitivity * uiScaleFactor).roundToInt().coerceIn(-127, 127)
+        val scroll = event.getAxisValue(MotionEvent.AXIS_VSCROLL).roundToInt()
+        
+        dwellHandler.removeCallbacks(dwellRunnable)
+        if (hidX != 0 || hidY != 0) {
+            isJoystickMoving = true
+            sendMouseReport(hidX, hidY, scroll)
+        } else if (isJoystickMoving) {
+            isJoystickMoving = false
+            val dwell = prefs.getInt("dwell_period", 500).toLong()
+            if (dwell > 0) dwellHandler.postDelayed(dwellRunnable, dwell)
+        }
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         when (keyCode) {
-            KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_1 -> { currentButtons = (currentButtons.toInt() or 0x01).toByte(); sendMouseReport(); return true }
-            KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_2 -> { currentButtons = (currentButtons.toInt() or 0x02).toByte(); sendMouseReport(); return true }
+            KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_1 -> { currentButtons = currentButtons or 0x01; sendMouseReport(); return true }
+            KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_2 -> { currentButtons = currentButtons or 0x02; sendMouseReport(); return true }
         }
         return super.onKeyDown(keyCode, event)
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         when (keyCode) {
-            KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_1 -> { currentButtons = (currentButtons.toInt() and 0x01.inv()).toByte(); sendMouseReport(); return true }
-            KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_2 -> { currentButtons = (currentButtons.toInt() and 0x02.inv()).toByte(); sendMouseReport(); return true }
+            KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_1 -> { currentButtons = currentButtons and 0x01.inv(); sendMouseReport(); return true }
+            KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_2 -> { currentButtons = currentButtons and 0x02.inv(); sendMouseReport(); return true }
         }
         return super.onKeyUp(keyCode, event)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        try { unregisterReceiver(receiver) } catch (e: Exception) {}
         if (isBound) { unbindService(connection); isBound = false }
     }
 }

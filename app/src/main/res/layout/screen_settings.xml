@@ -63,6 +63,74 @@
             android:orientation="vertical"
             android:padding="24dp">
 
+            <!-- WiFi Settings Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="WiFi Connection"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="@color/primary"
+                android:paddingBottom="8dp"/>
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="8dp">
+                <TextView
+                    android:id="@+id/label_ip"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="Receiver IP"
+                    android:textSize="22sp"
+                    android:textColor="@color/black"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toStartOf="@id/edit_ip"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"/>
+                <EditText
+                    android:id="@+id/edit_ip"
+                    android:layout_width="180dp"
+                    android:layout_height="50dp"
+                    android:background="@drawable/edit_text_border"
+                    android:hint="192.168.1.x"
+                    android:inputType="text"
+                    android:textAlignment="center"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"/>
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="8dp">
+                <TextView
+                    android:id="@+id/label_port"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="Receiver Port"
+                    android:textSize="22sp"
+                    android:textColor="@color/black"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toStartOf="@id/edit_port"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"/>
+                <EditText
+                    android:id="@+id/edit_port"
+                    android:layout_width="100dp"
+                    android:layout_height="50dp"
+                    android:background="@drawable/edit_text_border"
+                    android:hint="8888"
+                    android:inputType="number"
+                    android:textAlignment="center"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"/>
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEE" android:layout_marginVertical="16dp"/>
+
             <!-- Joystick Mode -->
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="match_parent"
