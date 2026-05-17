@@ -4,9 +4,7 @@ plugins {
 
 android {
     namespace = "osa.phomouse"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "osa.phomouse"

@@ -1,10 +1,12 @@
 package osa.phomouse
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -25,6 +27,7 @@ import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.ViewFlipper
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
 import androidx.core.content.ContextCompat
@@ -57,6 +60,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var availableAdapter: DeviceAdapter
 
     private var selectedDevice: DeviceItem? = null
+
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        if (permissions[Manifest.permission.POST_NOTIFICATIONS] == true) {
+            startService()
+        }
+    }
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -97,19 +108,12 @@ class MainActivity : AppCompatActivity() {
         applyUiScale(prefs.getInt("ui_scale", 50))
 
         setupRecyclerViews()
+        checkPermissions()
         requestBatteryOptimizations()
         setupNavigation()
         setupControllerButtons()
         setupSettings()
         setupInfoButtons()
-
-        val intent = Intent(this, MouseService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
-        }
-        bindService(intent, connection, BIND_AUTO_CREATE)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -121,6 +125,34 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
+    }
+
+    private fun checkPermissions() {
+        val permissions = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        
+        val missing = permissions.filter { 
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED 
+        }
+        
+        if (missing.isNotEmpty()) {
+            permissionLauncher.launch(missing.toTypedArray())
+        } else {
+            startService()
+        }
+    }
+
+    private fun startService() {
+        val intent = Intent(this, MouseService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+        bindService(intent, connection, BIND_AUTO_CREATE)
     }
 
     private fun applyUiScale(scale: Int) {

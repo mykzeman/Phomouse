@@ -1,40 +1,30 @@
-### 1. The Core Contradiction: SPP vs. Standard Android Mouse
+### 1. The Core Architecture: WiFi (UDP) Mouse Bridge
+**How it works:**
+* **UDP Transport:** The app now sends mouse signals over WiFi using UDP packets on port 5555. This removes the complexities of Bluetooth HID registration and SPP collisions.
+* **Easy Decoding:** Signals are sent as simple CSV strings: `buttons,dx,dy,wheel\n`. This allows any receiver script (Python, Node.js, etc.) to decode the signals with a single `split(',')` call.
+
+### 2. "Hands-Off" Input Device Strategy
 **How to fix it:**
-* **Do not use SPP for the Chair:** If you want the chair to act as a normal mouse for the phone in the background, **let the Android OS handle the connection to the chair**. Remove the power chair from the app's internal "Variable Tracking / Auto-Reconnect" serial logic entirely.
-* Your `MainActivity` Dual Mode Capture (`dispatchGenericMotionEvent`) is actually the perfect setup! When the app is in the foreground, `MainActivity` intercepts the Android mouse movements and sends them to the PC. When the app is in the background, `MainActivity` is paused, it stops intercepting, and the chair goes back to controlling your phone. You don't need SPP for this to work.
+* **OS-Level Input:** The app no longer manages connections to the Power Chair or other joysticks. Let the Android OS handle them. 
+* **Native Interception:** `MainActivity.dispatchGenericMotionEvent` intercepts the native Android mouse/joystick movement. This means as long as the device works with Android, it works with Phomouse.
+* **Dual Mode:** When Phomouse is in the foreground, it "captures" the mouse to bridge it to the PC. When in the background, the chair acts as a normal Android mouse for navigating the phone.
 
-### 2. The Bluetooth Radio Collision (HID Registration vs. SPP)
+### 3. WiFi Discovery & Connection
 **How to fix it:**
-* **Sequence the Connections:** Never attempt an SPP connection or an auto-reconnect while `registerApp` is firing.
-* Wait for the `onAppStatusChanged()` callback to return `true` (meaning the PC HID profile is fully registered and stable) **before** you allow the `MouseService` to initiate any SPP connections for secondary serial devices.
+* **Discovery Broadcast:** The "Add Device" button sends a `PHOMOUSE_DISCOVER` broadcast. Any receiver on the network should respond with `PHOMOUSE_ACK:DeviceName` to be discovered.
+* **Persistence:** Discovered and connected devices are saved in the "Paired Devices" list by their IP address for quick reconnection.
 
-### 3. The "Variable Tracking" & Auto-Reconnect Loop
+### 4. Background Reliability & Permissions
 **How to fix it:**
-* **Implement Exponential Backoff:** If a serial connection drops, do not immediately reconnect. Put the reconnection logic in a separate background thread with a delay (e.g., wait 3 seconds, then 5 seconds, then 10 seconds).
-* Check the socket state properly. Ensure you call `socket.close()` on the dropped connection before trying to instantiate a new `createRfcommSocketToServiceRecord`.
+* **Foreground Service:** The `MouseService` remains active in the background to maintain the WiFi bridge.
+* **Permissions:** Updated for Android 14+ (API 34+). Now includes `FOREGROUND_SERVICE_CONNECTED_DEVICE` and requests `POST_NOTIFICATIONS` and `ACCESS_FINE_LOCATION` at runtime.
+* **Power Management:** Requests to ignore battery optimizations to prevent UDP socket throttling.
 
-### 4. Background Service Constraints
-**How to fix it:**
-* **Threading:** Ensure your `connectSerialDevice` runs inside a standard Java `Thread`, `ExecutorService`, or Kotlin `Coroutine` (using `Dispatchers.IO`).
-* **Permissions Check:** Ensure your app has `BLUETOOTH_CONNECT` and `BLUETOOTH_SCAN`. More importantly, ensure your Foreground Service in the `AndroidManifest.xml` includes `foregroundServiceType="connectedDevice"`.
-
-### Summary of the Corrected Architecture
-To achieve your exact requirements safely, your app flow should look like this:
-
-1. **Bluetooth Setup Phase:**
-    * The app launches. The Foreground Service starts.
-    * The phone's Bluetooth connects to the PC via `BluetoothHidDevice.registerApp()`.
-    * **Wait** for the success callback. Do not attempt any other Bluetooth operations yet.
-2. **Local Input Phase:**
-    * **Power Chair (HID):** Handled entirely by the Android OS. It connects as a standard mouse. Your app does *not* try to connect to it via code.
-    * **Other Serial Devices (SPP):** If you have *other* hardware that strictly uses SPP, the Foreground Service now spins up an IO thread to connect them using `connectSerialDevice` and exponential backoff.
-3. **Control Phase (Foreground):**
-    * You open the app. `MainActivity` is on screen.
-    * You move the power chair joystick. Android receives this natively. `MainActivity.dispatchGenericMotionEvent` intercepts the movement.
-    * `MainActivity` applies your **UI Scale**, **Action Sensitivity**, and **Scroll Amount** preferences.
-    * It throttles the data to 10ms (100 reports/sec) and shoots it over the PC HID connection.
-    * Movement stops. The **Dwell Period** timer starts. Once elapsed, it fires a click to the PC.
-4. **Phone Control Phase (Background):**
-    * You press the home button. `MainActivity` is paused.
-    * The PC connection remains alive in the Foreground Service.
-    * Because `MainActivity` is no longer intercepting inputs, the power chair acts as a standard Android mouse, allowing you to use your phone's apps natively.
+### 5. Signal Format (Easy to Decode)
+* **Format:** `buttons,dx,dy,wheel\n`
+* **Port:** 5555 (UDP)
+* **Logic:** 
+    * `buttons`: Bitmask (1=Left, 2=Right)
+    * `dx/dy`: Relative movement (-127 to 127)
+    * `wheel`: Scroll amount (-127 to 127)
+* **Example:** `1,10,-5,0\n` (Left click, Move +10X, -5Y)

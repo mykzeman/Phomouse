@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
@@ -32,7 +33,16 @@ class MouseService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        startForeground(1, createNotification())
+        
+        val notification = createNotification()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+        } else {
+            startForeground(1, notification)
+        }
+        
         startReceiverThread()
     }
 
@@ -45,19 +55,23 @@ class MouseService : Service() {
                 }
                 val buffer = ByteArray(1024)
                 while (!executor.isShutdown) {
-                    val packet = DatagramPacket(buffer, buffer.size)
-                    socket?.receive(packet)
-                    val message = String(packet.data, 0, packet.length).trim()
-                    if (message.startsWith("PHOMOUSE_ACK:")) {
-                        val name = message.substringAfter("PHOMOUSE_ACK:")
-                        val address = packet.address.hostAddress
-                        if (address != null) {
-                            onDeviceDiscovered?.invoke(name, address)
+                    try {
+                        val packet = DatagramPacket(buffer, buffer.size)
+                        socket?.receive(packet)
+                        val message = String(packet.data, 0, packet.length).trim()
+                        if (message.startsWith("PHOMOUSE_ACK:")) {
+                            val name = message.substringAfter("PHOMOUSE_ACK:")
+                            val address = packet.address.hostAddress
+                            if (address != null) {
+                                onDeviceDiscovered?.invoke(name, address)
+                            }
                         }
+                    } catch (e: Exception) {
+                        if (!executor.isShutdown) Log.e("MouseService", "Packet receive error", e)
                     }
                 }
             } catch (e: Exception) {
-                Log.e("MouseService", "Receiver error", e)
+                Log.e("MouseService", "Receiver thread setup error", e)
             }
         }
     }
@@ -79,6 +93,7 @@ class MouseService : Service() {
             .setContentTitle("Phomouse WiFi Active")
             .setContentText("Sending mouse signals over WiFi")
             .setSmallIcon(R.mipmap.ic_launcher)
+            .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
