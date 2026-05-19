@@ -10,6 +10,7 @@
     * `LB`: Left Button click. Value: Dwell setting.
     * `RB`: Right Button click. Value: Dwell setting.
     * `MB`: Middle Button click. Value: Dwell setting.
+    * `MV`: Mouse Movement. Value: x,y relative movement.
     * `SU`: Scroll Up. Value: Scroll amount.
     * `SD`: Scroll Down. Value: Scroll amount.
     * `DS`: Drag Start. Value: Action sensitivity amount. (Persists until `DR` is sent).
@@ -17,7 +18,7 @@
 
 ### 3. Input Strategy
 * **Native Interception:** `MainActivity.dispatchGenericMotionEvent` captures system-level joystick/mouse events and translates them into the `PMCMD` serial protocol strings.
-
+* **Click Joystick:** The left click button on the controller screen acts as a virtual joystick. Moving within the button sends `MV` commands. Releasing the button triggers an `LB` command.
 ### 4. Application Flow
 **How it works:**
 1. **Devices Screen** : The Index page. Lists the paired devices. Click on the device to open the controller page. Or visit the device information by pressing the `i`. Or click on the `+` button to add a new device.
