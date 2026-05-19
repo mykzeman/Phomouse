@@ -71,10 +71,15 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         prefs = getSharedPreferences("PhomousePrefs", MODE_PRIVATE)
-        if (prefs.getBoolean("dyslexic_mode", false)) {
-            setTheme(R.style.Theme_Phomouse_Dyslexic)
-        } else {
-            setTheme(R.style.Theme_Phomouse)
+        
+        val isDyslexic = prefs.getBoolean("dyslexic_mode", false)
+        val isColourblind = prefs.getBoolean("colourblind_mode", false)
+
+        when {
+            isDyslexic && isColourblind -> setTheme(R.style.Theme_Phomouse_Dyslexic_Colourblind)
+            isDyslexic -> setTheme(R.style.Theme_Phomouse_Dyslexic)
+            isColourblind -> setTheme(R.style.Theme_Phomouse_Colourblind)
+            else -> setTheme(R.style.Theme_Phomouse)
         }
         
         super.onCreate(savedInstanceState)
@@ -82,7 +87,9 @@ class MainActivity : AppCompatActivity() {
         
         viewFlipper = findViewById(R.id.app_view_flipper)
         // Consolidate to controller screen (index 2 in original Flipper)
-        viewFlipper.displayedChild = 2 
+        // Check if we should return to settings after recreation
+        val targetScreen = intent.getIntExtra("target_screen", 2)
+        viewFlipper.displayedChild = targetScreen
 
         checkPermissions()
         setupNavigation()
@@ -149,8 +156,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupNavigation() {
         findViewById<ImageButton>(R.id.btn_home_controller).setOnClickListener { 
-            // Stay on controller or show device list? Requirement says stay on one screen.
-            // We'll keep it on controller.
+            viewFlipper.displayedChild = 0
         }
         findViewById<ImageButton>(R.id.btn_settings_controller).setOnClickListener { 
             viewFlipper.displayedChild = 4 // Settings screen
@@ -204,6 +210,23 @@ class MainActivity : AppCompatActivity() {
             isChecked = prefs.getBoolean("joystick_enabled", true)
             setOnCheckedChangeListener { _, checked -> prefs.edit { putBoolean("joystick_enabled", checked) } }
         }
+        
+        findViewById<SwitchCompat>(R.id.switch_dyslexic).apply {
+            isChecked = prefs.getBoolean("dyslexic_mode", false)
+            setOnCheckedChangeListener { _, checked -> 
+                prefs.edit { putBoolean("dyslexic_mode", checked) }
+                restartActivity()
+            }
+        }
+
+        findViewById<SwitchCompat>(R.id.switch_colourblind).apply {
+            isChecked = prefs.getBoolean("colourblind_mode", false)
+            setOnCheckedChangeListener { _, checked -> 
+                prefs.edit { putBoolean("colourblind_mode", checked) }
+                restartActivity()
+            }
+        }
+
         findViewById<SeekBar>(R.id.seekbar_sensitivity).apply {
             progress = prefs.getInt("sensitivity", 50)
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -212,6 +235,14 @@ class MainActivity : AppCompatActivity() {
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
             })
         }
+    }
+
+    private fun restartActivity() {
+        val intent = intent
+        intent.putExtra("target_screen", viewFlipper.displayedChild)
+        finish()
+        startActivity(intent)
+        overridePendingTransition(0, 0)
     }
 
     private fun createWatcher(key: String, def: Int) = object : TextWatcher {
