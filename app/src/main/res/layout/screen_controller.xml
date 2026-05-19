@@ -4,13 +4,13 @@
     android:id="@+id/screen_controller"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white">
+    android:background="?attr/colorSurface">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/header_controller"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="16dp"
+        android:padding="12dp"
         app:layout_constraintTop_toTopOf="parent">
 
         <ImageButton
@@ -26,9 +26,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="CONTROLLER"
-            android:textSize="32sp"
+            android:textSize="28sp"
             android:textStyle="bold"
-            android:textColor="@color/black"
+            android:textColor="?attr/colorOnSurface"
             android:fontFamily="?attr/mainFontFamily"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
@@ -49,18 +49,19 @@
         android:id="@+id/status_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Connected to Lorem Ipsum"
-        android:textSize="20sp"
+        android:text="Not Connected"
+        android:textSize="18sp"
         android:textColor="@color/black"
         android:background="@color/accent"
         android:gravity="center"
-        android:paddingVertical="24dp"
+        android:paddingVertical="16dp"
         android:fontFamily="?attr/mainFontFamily"
         app:layout_constraintTop_toBottomOf="@id/header_controller" />
 
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:fillViewport="true"
         app:layout_constraintTop_toBottomOf="@id/status_bar"
         app:layout_constraintBottom_toBottomOf="parent">
 
@@ -68,98 +69,111 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp"
+            android:padding="12dp"
             android:gravity="center_horizontal">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_left_click"
                 android:layout_width="match_parent"
-                android:layout_height="100dp"
+                android:layout_height="80dp"
                 android:text="Left Click"
-                android:textSize="24sp"
+                android:textSize="22sp"
                 android:textColor="@color/black"
                 android:textAllCaps="false"
                 android:backgroundTint="@color/accent"
-                app:cornerRadius="16dp"
-                android:layout_marginTop="16dp"/>
+                app:cornerRadius="12dp"
+                android:layout_marginTop="8dp"/>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="16dp">
+                android:layout_marginTop="8dp">
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_right_click"
                     android:layout_width="0dp"
                     android:layout_weight="1"
-                    android:layout_height="100dp"
-                    android:text="Right Click"
-                    android:textSize="18sp"
+                    android:layout_height="80dp"
+                    android:text="Right"
+                    android:textSize="16sp"
                     android:textColor="@color/black"
                     android:textAllCaps="false"
                     android:backgroundTint="@color/primary"
-                    app:cornerRadius="16dp"
-                    android:layout_marginEnd="8dp"/>
+                    app:cornerRadius="12dp"
+                    android:layout_marginEnd="4dp"/>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_middle_click"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="80dp"
+                    android:text="Middle"
+                    android:textSize="16sp"
+                    android:textColor="@color/black"
+                    android:textAllCaps="false"
+                    android:backgroundTint="@color/primary"
+                    app:cornerRadius="12dp"
+                    android:layout_marginHorizontal="4dp"/>
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_double_click"
                     android:layout_width="0dp"
                     android:layout_weight="1"
-                    android:layout_height="100dp"
-                    android:text="Double Click"
-                    android:textSize="18sp"
+                    android:layout_height="80dp"
+                    android:text="Double"
+                    android:textSize="16sp"
                     android:textColor="@color/black"
                     android:textAllCaps="false"
                     android:backgroundTint="@color/primary"
-                    app:cornerRadius="16dp"
-                    android:layout_marginStart="8dp"/>
+                    app:cornerRadius="12dp"
+                    android:layout_marginStart="4dp"/>
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="16dp">
+                android:layout_marginTop="8dp">
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_scroll_up"
                     android:layout_width="0dp"
                     android:layout_weight="1"
-                    android:layout_height="100dp"
+                    android:layout_height="80dp"
                     android:text="Scroll Up"
-                    android:textSize="18sp"
+                    android:textSize="16sp"
                     android:textColor="@color/black"
                     android:textAllCaps="false"
                     android:backgroundTint="@color/primary"
-                    app:cornerRadius="16dp"
-                    android:layout_marginEnd="8dp"/>
+                    app:cornerRadius="12dp"
+                    android:layout_marginEnd="4dp"/>
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_scroll_down"
                     android:layout_width="0dp"
                     android:layout_weight="1"
-                    android:layout_height="100dp"
+                    android:layout_height="80dp"
                     android:text="Scroll Down"
-                    android:textSize="18sp"
+                    android:textSize="16sp"
                     android:textColor="@color/black"
                     android:textAllCaps="false"
                     android:backgroundTint="@color/primary"
-                    app:cornerRadius="16dp"
-                    android:layout_marginStart="8dp"/>
+                    app:cornerRadius="12dp"
+                    android:layout_marginStart="4dp"/>
             </LinearLayout>
 
-            <!-- Drag Container -->
+            <!-- Drag & Move Container -->
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="#F0F5FA"
-                android:layout_marginTop="24dp"
-                android:padding="16dp">
+                android:layout_marginTop="16dp"
+                android:padding="12dp"
+                android:elevation="2dp">
 
                 <TextView
                     android:id="@+id/label_drag"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Drag"
+                    android:text="Drag &amp;\nMove"
                     android:textStyle="bold"
-                    android:textSize="18sp"
+                    android:textSize="16sp"
                     android:textColor="@color/black"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
@@ -176,76 +190,76 @@
                     app:layout_constraintTop_toTopOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent">
 
-                    <Space android:layout_width="70dp" android:layout_height="70dp" />
+                    <Space android:layout_width="60dp" android:layout_height="60dp" />
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_drag_up"
-                        android:layout_width="70dp"
-                        android:layout_height="70dp"
+                        android:layout_width="60dp"
+                        android:layout_height="60dp"
                         android:padding="0dp"
-                        android:text="Drag\nUp"
-                        android:textSize="12sp"
+                        android:text="▲"
+                        android:textSize="20sp"
                         android:textColor="@color/black"
                         android:backgroundTint="@color/accent"
-                        app:cornerRadius="12dp"
-                        android:layout_margin="4dp"/>
-                    <Space android:layout_width="70dp" android:layout_height="70dp" />
+                        app:cornerRadius="8dp"
+                        android:layout_margin="2dp"/>
+                    <Space android:layout_width="60dp" android:layout_height="60dp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_drag_left"
-                        android:layout_width="70dp"
-                        android:layout_height="70dp"
+                        android:layout_width="60dp"
+                        android:layout_height="60dp"
                         android:padding="0dp"
-                        android:text="Drag\nLeft"
-                        android:textSize="12sp"
+                        android:text="◀"
+                        android:textSize="20sp"
                         android:textColor="@color/black"
                         android:backgroundTint="@color/accent"
-                        app:cornerRadius="12dp"
-                        android:layout_margin="4dp"/>
+                        app:cornerRadius="8dp"
+                        android:layout_margin="2dp"/>
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_grab"
-                        android:layout_width="70dp"
-                        android:layout_height="70dp"
+                        android:layout_width="60dp"
+                        android:layout_height="60dp"
                         android:padding="0dp"
                         android:text="Grab"
-                        android:textSize="12sp"
+                        android:textSize="14sp"
                         android:textColor="@color/black"
                         android:backgroundTint="@color/accent"
-                        app:cornerRadius="12dp"
-                        android:layout_margin="4dp"/>
+                        app:cornerRadius="8dp"
+                        android:layout_margin="2dp"/>
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_drag_right"
-                        android:layout_width="70dp"
-                        android:layout_height="70dp"
+                        android:layout_width="60dp"
+                        android:layout_height="60dp"
                         android:padding="0dp"
-                        android:text="Drag\nRight"
-                        android:textSize="12sp"
+                        android:text="▶"
+                        android:textSize="20sp"
                         android:textColor="@color/black"
                         android:backgroundTint="@color/accent"
-                        app:cornerRadius="12dp"
-                        android:layout_margin="4dp"/>
+                        app:cornerRadius="8dp"
+                        android:layout_margin="2dp"/>
 
-                    <Space android:layout_width="70dp" android:layout_height="70dp" />
+                    <Space android:layout_width="60dp" android:layout_height="60dp" />
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_drag_down"
-                        android:layout_width="70dp"
-                        android:layout_height="70dp"
+                        android:layout_width="60dp"
+                        android:layout_height="60dp"
                         android:padding="0dp"
-                        android:text="Drag\nDown"
-                        android:textSize="12sp"
+                        android:text="▼"
+                        android:textSize="20sp"
                         android:textColor="@color/black"
                         android:backgroundTint="@color/accent"
-                        app:cornerRadius="12dp"
-                        android:layout_margin="4dp"/>
-                    <Space android:layout_width="70dp" android:layout_height="70dp" />
+                        app:cornerRadius="8dp"
+                        android:layout_margin="2dp"/>
+                    <Space android:layout_width="60dp" android:layout_height="60dp" />
 
                 </GridLayout>
 
                 <TextView
                     android:id="@+id/label_tap_grab"
-                    android:layout_width="80dp"
+                    android:layout_width="70dp"
                     android:layout_height="wrap_content"
-                    android:text="Tap grab to start"
-                    android:textSize="14sp"
+                    android:text="Grab to Start Drag"
+                    android:textSize="12sp"
                     android:textColor="@color/black"
                     android:gravity="center"
                     app:layout_constraintEnd_toEndOf="parent"
