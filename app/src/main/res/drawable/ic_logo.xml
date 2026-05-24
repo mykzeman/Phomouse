@@ -1,0 +1,24 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+  <!-- Left Side: Custom Mouse shape -->
+  <path
+      android:fillColor="#4EB9FD"
+      android:pathData="M24,10 C16,10 14,14 14,24 L14,32 L34,32 L34,24 C34,14 32,10 24,10 Z" />
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M14,32 L14,46 C14,54 18,54 24,54 C30,54 34,54 34,46 L34,32 Z"/>
+  <!-- Outline of mouse -->
+  <path
+      android:strokeColor="#1C1B1F"
+      android:strokeWidth="2"
+      android:pathData="M24,10 C16,10 14,14 14,24 L14,46 C14,54 18,54 24,54 C30,54 34,54 34,46 L34,24 C34,14 32,10 24,10 Z M14,32 L34,32 M24,10 L24,32" />
+  <!-- Cyan Right Side Letter shape -->
+  <path
+      android:fillColor="#0BFEC8"
+      android:strokeColor="#1C1B1F"
+      android:strokeWidth="2"
+      android:pathData="M44,14 C36,14 36,24 40,30 L40,32 C38,36 44,38 42,42 L42,54 C48,54 52,48 52,36 C52,24 50,14 44,14 Z" />
+</vector>

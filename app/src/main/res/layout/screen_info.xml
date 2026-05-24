@@ -146,7 +146,8 @@
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:src="@drawable/ic_refresh"
-                app:tint="@color/black"/>
+                app:tint="@color/black"
+                android:contentDescription="Retry icon"/>
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -172,7 +173,8 @@
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:src="@drawable/ic_delete"
-                app:tint="@color/error"/>
+                app:tint="@color/error"
+                android:contentDescription="Forget icon"/>
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
