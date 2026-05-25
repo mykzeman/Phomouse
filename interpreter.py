@@ -3,7 +3,7 @@ import re
 import pyautogui as gui
 
 COM_PORT = 'COM5'
-BAUD_RATE = 9600
+BAUD_RATE = 900
 
 # Disable pyautogui failsafe so you can reach the edges of the screen
 gui.FAILSAFE = False
@@ -46,8 +46,8 @@ def process_data(data: str):
                     
                     # Convert value to integer safely
                     try:
-                        v=v[1:-1]
-                        v = int(val_str)
+                        v=val_str[1:-1]
+                        v = int(v)
                         print(f"Processing command '{cmd}' with value {v}")
                     except ValueError:
                         v = 0
