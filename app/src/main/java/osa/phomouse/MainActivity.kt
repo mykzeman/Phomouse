@@ -4,21 +4,23 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
-import android.content.ComponentName
+import android.bluetooth.BluetoothSocket
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
-import android.content.ServiceConnection
+import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
-import android.os.IBinder
 import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.Log
 import android.view.InputDevice
-import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.View
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.SeekBar
@@ -30,15 +32,19 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.floatingactionbutton.FloatingActionButton
+import java.io.IOException
+import java.io.OutputStream
+import java.util.*
+import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var viewFlipper: ViewFlipper
-    private var mouseService: MouseService? = null
-    private var isBound = false
-
     private lateinit var prefs: SharedPreferences
     
     private val dwellHandler = Handler(Looper.getMainLooper())
@@ -47,61 +53,139 @@ class MainActivity : AppCompatActivity() {
         sendBluetoothCommand("LB", prefs.getInt("dwell_period", 500).toString())
     }
 
+    private lateinit var pairedAdapter: DeviceAdapter
+    private lateinit var availableAdapter: DeviceAdapter
+    private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
+
+    // Bluetooth serial communication members
+    private val executor = Executors.newSingleThreadExecutor()
+    private var bluetoothSocket: BluetoothSocket? = null
+    private var outputStream: OutputStream? = null
+    private val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+
+    private val bluetoothReceiver = object : BroadcastReceiver() {
+        @SuppressLint("MissingPermission")
+        override fun onReceive(context: Context, intent: Intent) {
+            when(intent.action) {
+                BluetoothDevice.ACTION_FOUND -> {
+                    val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    device?.let {
+                        val name = it.name ?: "Unknown Device"
+                        val item = DeviceItem(name, it.address, false)
+                        val currentList = availableAdapter.currentList.toMutableList()
+                        if (currentList.none { d -> d.address == item.address }) {
+                            currentList.add(item)
+                            availableAdapter.submitList(currentList)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         if (permissions.all { it.value }) {
             setupBluetooth()
-        }
-    }
-
-    private val connection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            val binder = service as MouseService.LocalBinder
-            mouseService = binder.getService()
-            isBound = true
-            autoConnect()
-        }
-
-        override fun onServiceDisconnected(name: ComponentName?) {
-            mouseService = null
-            isBound = false
+            loadPairedDevices()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         prefs = getSharedPreferences("PhomousePrefs", MODE_PRIVATE)
-        if (prefs.getBoolean("dyslexic_mode", false)) {
-            setTheme(R.style.Theme_Phomouse_Dyslexic)
-        } else {
-            setTheme(R.style.Theme_Phomouse)
+        
+        val isDyslexic = prefs.getBoolean("dyslexic_mode", false)
+        val isColourblind = prefs.getBoolean("colourblind_mode", false)
+
+        when {
+            isDyslexic && isColourblind -> setTheme(R.style.Theme_Phomouse_Dyslexic_Colourblind)
+            isDyslexic -> setTheme(R.style.Theme_Phomouse_Dyslexic)
+            isColourblind -> setTheme(R.style.Theme_Phomouse_Colourblind)
+            else -> setTheme(R.style.Theme_Phomouse)
         }
         
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         
         viewFlipper = findViewById(R.id.app_view_flipper)
-        // Consolidate to controller screen (index 2 in original Flipper)
-        viewFlipper.displayedChild = 2 
-
-        checkPermissions()
+        
+        setupAdapters()
+        setupIndexScreen()
+        setupAddDeviceScreen()
+        setupInfoScreen()
         setupNavigation()
         setupControllerButtons()
         setupSettings()
 
+        // Default screen to Index (0)
+        val targetScreen = intent.getIntExtra("target_screen", 0)
+        viewFlipper.displayedChild = targetScreen
+
+        checkPermissions()
+
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (viewFlipper.displayedChild != 2) {
-                    viewFlipper.displayedChild = 2
-                } else {
-                    isEnabled = false
-                    onBackPressedDispatcher.onBackPressed()
+                when (viewFlipper.displayedChild) {
+                    1, 2, 3, 4 -> viewFlipper.displayedChild = 0 
+                    0 -> {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                    }
                 }
             }
         })
 
-        val intent = Intent(this, MouseService::class.java)
-        bindService(intent, connection, BIND_AUTO_CREATE)
+        autoConnect()
+        
+        val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
+        registerReceiver(bluetoothReceiver, filter)
+    }
+
+    private fun setupAdapters() {
+        pairedAdapter = DeviceAdapter(
+            onItemClick = { device -> connectToDevice(device.address, device.name) },
+            onInfoClick = { device -> showDeviceInfo(device) }
+        )
+        availableAdapter = DeviceAdapter(
+            onItemClick = { device -> connectToDevice(device.address, device.name) },
+            onInfoClick = { device -> showDeviceInfo(device) }
+        )
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun connectToDevice(deviceAddress: String, deviceName: String) {
+        prefs.edit { putString("last_bt_device", deviceAddress) }
+        viewFlipper.displayedChild = 2 // Move to controller
+        updateStatusBar("Connecting to $deviceName...")
+
+        executor.execute {
+            val adapter = BluetoothAdapter.getDefaultAdapter() ?: return@execute
+            val device: BluetoothDevice = adapter.getRemoteDevice(deviceAddress)
+            
+            try {
+                disconnectInternal()
+                bluetoothSocket = device.createRfcommSocketToServiceRecord(SPP_UUID)
+                bluetoothSocket?.connect()
+                outputStream = bluetoothSocket?.outputStream
+                Log.d("MainActivity", "Connected to Bluetooth device: $deviceAddress")
+                runOnUiThread { updateStatusBar("Connected to $deviceName") }
+            } catch (e: IOException) {
+                Log.e("MainActivity", "Connection failed", e)
+                disconnectInternal()
+                runOnUiThread { updateStatusBar("Connection failed") }
+            }
+        }
+    }
+
+    private fun disconnectInternal() {
+        try {
+            bluetoothSocket?.close()
+        } catch (e: IOException) {
+            Log.e("MainActivity", "Error closing socket", e)
+        }
+        bluetoothSocket = null
+        outputStream = null
     }
 
     private fun checkPermissions() {
@@ -120,24 +204,73 @@ class MainActivity : AppCompatActivity() {
             permissionLauncher.launch(missing.toTypedArray())
         } else {
             setupBluetooth()
+            loadPairedDevices()
         }
     }
 
     @SuppressLint("MissingPermission")
     private fun setupBluetooth() {
-        // Just ensuring BT is enabled
-        val adapter = BluetoothAdapter.getDefaultAdapter()
-        if (adapter != null && !adapter.isEnabled) {
+        if (bluetoothAdapter != null && !bluetoothAdapter.isEnabled) {
             // Optional: Request enable
         }
     }
 
     @SuppressLint("MissingPermission")
+    private fun loadPairedDevices() {
+        val pairedDevices = bluetoothAdapter?.bondedDevices ?: emptySet()
+        val devices = pairedDevices.map { DeviceItem(it.name ?: "Unknown", it.address, true) }
+        pairedAdapter.submitList(devices)
+    }
+
+    private fun setupIndexScreen() {
+        findViewById<RecyclerView>(R.id.rv_paired_devices)?.apply {
+            layoutManager = LinearLayoutManager(this@MainActivity)
+            adapter = pairedAdapter
+        }
+        findViewById<FloatingActionButton>(R.id.fab_add)?.setOnClickListener {
+            viewFlipper.displayedChild = 1 // Add screen
+            startDiscovery()
+        }
+        findViewById<ImageButton>(R.id.btn_settings_index)?.setOnClickListener {
+            viewFlipper.displayedChild = 4 // Settings
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun startDiscovery() {
+        if (bluetoothAdapter?.isDiscovering == true) {
+            bluetoothAdapter.cancelDiscovery()
+        }
+        availableAdapter.submitList(emptyList())
+        bluetoothAdapter?.startDiscovery()
+    }
+
+    private fun setupAddDeviceScreen() {
+        findViewById<RecyclerView>(R.id.rv_available_devices)?.apply {
+            layoutManager = LinearLayoutManager(this@MainActivity)
+            adapter = availableAdapter
+        }
+        findViewById<ImageButton>(R.id.btn_home_add)?.setOnClickListener { 
+            bluetoothAdapter?.cancelDiscovery()
+            viewFlipper.displayedChild = 0 
+        }
+    }
+
+    private fun showDeviceInfo(device: DeviceItem) {
+        findViewById<TextView>(R.id.tv_info_device_name)?.text = device.name
+        findViewById<TextView>(R.id.tv_info_status)?.text = if (device.isPaired) "Paired" else "Available"
+        viewFlipper.displayedChild = 3 // Info screen
+    }
+
+    private fun setupInfoScreen() {
+        findViewById<ImageButton>(R.id.btn_home_info)?.setOnClickListener { viewFlipper.displayedChild = 0 }
+        findViewById<ImageButton>(R.id.btn_settings_info)?.setOnClickListener { viewFlipper.displayedChild = 4 }
+    }
+
     private fun autoConnect() {
         val lastDevice = prefs.getString("last_bt_device", null)
         if (lastDevice != null) {
-            mouseService?.connectToDevice(lastDevice)
-            updateStatusBar("Connecting...")
+            connectToDevice(lastDevice, "Saved Device")
         } else {
             updateStatusBar("No device paired")
         }
@@ -148,63 +281,146 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupNavigation() {
-        findViewById<ImageButton>(R.id.btn_home_controller).setOnClickListener { 
-            // Stay on controller or show device list? Requirement says stay on one screen.
-            // We'll keep it on controller.
+        findViewById<ImageButton>(R.id.btn_home_controller)?.setOnClickListener { 
+            viewFlipper.displayedChild = 0
         }
-        findViewById<ImageButton>(R.id.btn_settings_controller).setOnClickListener { 
-            viewFlipper.displayedChild = 4 // Settings screen
+        findViewById<ImageButton>(R.id.btn_settings_controller)?.setOnClickListener { 
+            viewFlipper.displayedChild = 4 
         }
-        findViewById<ImageButton>(R.id.btn_back_settings).setOnClickListener { 
-            viewFlipper.displayedChild = 2 
+        findViewById<ImageButton>(R.id.btn_back_settings)?.setOnClickListener { 
+            viewFlipper.displayedChild = 2 // Return to controller
         }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private fun setupControllerButtons() {
-        findViewById<MaterialButton>(R.id.btn_left_click).setOnClickListener { 
-            sendBluetoothCommand("LB", prefs.getInt("dwell_period", 500).toString()) 
+        val dwellValue = { prefs.getInt("dwell_period", 500).toString() }
+        val scrollValue = { prefs.getInt("scroll_amount", 1).toString() }
+        val sensitivityValue = { prefs.getInt("sensitivity", 50) }
+
+        val btnLeft = findViewById<MaterialButton>(R.id.btn_left_click)
+        
+        // VIRTUAL JOYSTICK ON LEFT CLICK BUTTON
+        btnLeft?.setOnTouchListener { v, event ->
+            val joystickEnabled = prefs.getBoolean("joystick_enabled", true)
+            if (joystickEnabled) {
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        v.isPressed = true
+                        true
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        val centerX = v.width / 2f
+                        val centerY = v.height / 2f
+                        // Map relative position to -127 to 127
+                        val dx = ((event.x - centerX) / centerX * 127).roundToInt().coerceIn(-127, 127)
+                        val dy = ((event.y - centerY) / centerY * 127).roundToInt().coerceIn(-127, 127)
+                        
+                        if (dx != 0 || dy != 0) {
+                            sendBluetoothCommand("MV", "$dx,$dy")
+                        }
+                        true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        v.isPressed = false
+                        // Trigger Left Click on Release as per IMPROVEMENTS.md
+                        sendBluetoothCommand("LB", dwellValue())
+                        v.performClick()
+                        true
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        v.isPressed = false
+                        true
+                    }
+                    else -> false
+                }
+            } else {
+                false
+            }
         }
-        findViewById<MaterialButton>(R.id.btn_right_click).setOnClickListener { 
-            sendBluetoothCommand("RB", prefs.getInt("dwell_period", 500).toString()) 
+
+        btnLeft?.setOnClickListener {
+            // Only send command here if virtual joystick is DISABLED
+            if (!prefs.getBoolean("joystick_enabled", true)) {
+                sendBluetoothCommand("LB", dwellValue())
+            }
         }
-        findViewById<MaterialButton>(R.id.btn_double_click).setOnClickListener {
+
+        findViewById<MaterialButton>(R.id.btn_right_click)?.setOnClickListener { 
+            sendBluetoothCommand("RB", dwellValue()) 
+        }
+        findViewById<MaterialButton>(R.id.btn_middle_click)?.setOnClickListener { 
+            sendBluetoothCommand("MB", dwellValue()) 
+        }
+        findViewById<MaterialButton>(R.id.btn_double_click)?.setOnClickListener {
             sendBluetoothCommand("LB", "0")
             it.postDelayed({ sendBluetoothCommand("LB", "0") }, 100)
         }
-        findViewById<MaterialButton>(R.id.btn_scroll_up).setOnClickListener {
-            sendBluetoothCommand("SU", prefs.getInt("scroll_amount", 1).toString())
+        findViewById<MaterialButton>(R.id.btn_scroll_up)?.setOnClickListener {
+            sendBluetoothCommand("SU", scrollValue())
         }
-        findViewById<MaterialButton>(R.id.btn_scroll_down).setOnClickListener {
-            sendBluetoothCommand("SD", prefs.getInt("scroll_amount", 1).toString())
+        findViewById<MaterialButton>(R.id.btn_scroll_down)?.setOnClickListener {
+            sendBluetoothCommand("SD", scrollValue())
         }
         
         var isDragging = false
-        findViewById<MaterialButton>(R.id.btn_grab).setOnClickListener {
+        val btnGrab = findViewById<MaterialButton>(R.id.btn_grab)
+        btnGrab?.setOnClickListener {
             isDragging = !isDragging
             if (isDragging) {
-                sendBluetoothCommand("DS", prefs.getInt("sensitivity", 50).toString())
-                (it as MaterialButton).text = "Release"
+                sendBluetoothCommand("DS", sensitivityValue().toString())
+                btnGrab.text = "Rel."
             } else {
                 sendBluetoothCommand("DR", "0")
-                (it as MaterialButton).text = "Grab"
+                btnGrab.text = "Grab"
             }
         }
+
+        // D-pad Movement: Disabled if joystick mode is active
+        val onDpadClick = { dx: Int, dy: Int ->
+            if (!prefs.getBoolean("joystick_enabled", true)) {
+                val step = (sensitivityValue() / 5).coerceAtLeast(1)
+                sendBluetoothCommand("MV", "${dx * step},${dy * step}")
+            }
+        }
+
+        findViewById<MaterialButton>(R.id.btn_drag_up)?.setOnClickListener { onDpadClick(0, -1) }
+        findViewById<MaterialButton>(R.id.btn_drag_down)?.setOnClickListener { onDpadClick(0, 1) }
+        findViewById<MaterialButton>(R.id.btn_drag_left)?.setOnClickListener { onDpadClick(-1, 0) }
+        findViewById<MaterialButton>(R.id.btn_drag_right)?.setOnClickListener { onDpadClick(1, 0) }
     }
 
     private fun setupSettings() {
-        findViewById<EditText>(R.id.edit_dwell).apply {
+        findViewById<EditText>(R.id.edit_dwell)?.apply {
             setText(prefs.getInt("dwell_period", 500).toString())
             addTextChangedListener(createWatcher("dwell_period", 500))
         }
-        findViewById<EditText>(R.id.edit_scroll).apply {
+        findViewById<EditText>(R.id.edit_scroll)?.apply {
             setText(prefs.getInt("scroll_amount", 1).toString())
             addTextChangedListener(createWatcher("scroll_amount", 1))
         }
-        findViewById<SwitchCompat>(R.id.switch_joystick).apply {
+        findViewById<SwitchCompat>(R.id.switch_joystick)?.apply {
             isChecked = prefs.getBoolean("joystick_enabled", true)
             setOnCheckedChangeListener { _, checked -> prefs.edit { putBoolean("joystick_enabled", checked) } }
         }
-        findViewById<SeekBar>(R.id.seekbar_sensitivity).apply {
+        
+        findViewById<SwitchCompat>(R.id.switch_dyslexic)?.apply {
+            isChecked = prefs.getBoolean("dyslexic_mode", false)
+            setOnCheckedChangeListener { _, checked -> 
+                prefs.edit { putBoolean("dyslexic_mode", checked) }
+                restartActivity()
+            }
+        }
+
+        findViewById<SwitchCompat>(R.id.switch_colourblind)?.apply {
+            isChecked = prefs.getBoolean("colourblind_mode", false)
+            setOnCheckedChangeListener { _, checked -> 
+                prefs.edit { putBoolean("colourblind_mode", checked) }
+                restartActivity()
+            }
+        }
+
+        findViewById<SeekBar>(R.id.seekbar_sensitivity)?.apply {
             progress = prefs.getInt("sensitivity", 50)
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, user: Boolean) { prefs.edit { putInt("sensitivity", p) } }
@@ -214,17 +430,39 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun restartActivity() {
+        val intent = intent
+        intent.putExtra("target_screen", viewFlipper.displayedChild)
+        finish()
+        startActivity(intent)
+        overridePendingTransition(0, 0)
+    }
+
     private fun createWatcher(key: String, def: Int) = object : TextWatcher {
-        override fun afterTextChanged(s: Editable?) { prefs.edit { putInt(key, s.toString().toIntOrNull() ?: def) } }
+        override fun afterTextChanged(s: Editable?) { 
+            val text = s.toString()
+            if (text.isNotEmpty()) {
+                prefs.edit { putInt(key, text.toIntOrNull() ?: def) }
+            }
+        }
         override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
         override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) {}
     }
 
     private fun sendBluetoothCommand(cmd: String, value: String) {
-        mouseService?.sendCommand(cmd, value)
+        val message = "PMCMD:[$cmd]-{$value}\n"
+        executor.execute {
+            try {
+                outputStream?.write(message.toByteArray())
+                outputStream?.flush()
+            } catch (e: IOException) {
+                Log.e("MainActivity", "Failed to send command: $message", e)
+            }
+        }
     }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        // Physical joystick handling: Only active if Joystick Mode is enabled
         if (!prefs.getBoolean("joystick_enabled", true)) return super.dispatchGenericMotionEvent(event)
         
         val isJoy = event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
@@ -249,6 +487,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        if (isBound) { unbindService(connection); isBound = false }
+        try {
+            unregisterReceiver(bluetoothReceiver)
+        } catch (e: Exception) {}
+        disconnectInternal()
+        executor.shutdown()
     }
 }

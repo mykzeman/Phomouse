@@ -13,6 +13,15 @@
         <item name="mainFontFamily">@font/cadman</item>
     </style>
 
+    <style name="Theme.Phomouse.Colourblind" parent="Base.Theme.Phomouse">
+        <item name="colorPrimary">#0072B2</item> <!-- Blue -->
+        <item name="colorAccent">#D55E00</item> <!-- Vermilion -->
+    </style>
+
+    <style name="Theme.Phomouse.Dyslexic.Colourblind" parent="Theme.Phomouse.Colourblind">
+        <item name="mainFontFamily">@font/cadman</item>
+    </style>
+
     <style name="ShapeAppearance.Phomouse.RoundedFAB" parent="ShapeAppearance.Material3.MediumComponent">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">24dp</item>
