@@ -4,18 +4,16 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothSocket
 import android.content.BroadcastReceiver
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.ServiceConnection
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
-import android.os.IBinder
 import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
@@ -38,14 +36,15 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import java.io.IOException
+import java.io.OutputStream
+import java.util.*
+import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var viewFlipper: ViewFlipper
-    private var mouseService: MouseService? = null
-    private var isBound = false
-
     private lateinit var prefs: SharedPreferences
     
     private val dwellHandler = Handler(Looper.getMainLooper())
@@ -57,6 +56,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var pairedAdapter: DeviceAdapter
     private lateinit var availableAdapter: DeviceAdapter
     private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
+
+    // Bluetooth serial communication members
+    private val executor = Executors.newSingleThreadExecutor()
+    private var bluetoothSocket: BluetoothSocket? = null
+    private var outputStream: OutputStream? = null
+    private val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
     private val bluetoothReceiver = object : BroadcastReceiver() {
         @SuppressLint("MissingPermission")
@@ -84,20 +89,6 @@ class MainActivity : AppCompatActivity() {
         if (permissions.all { it.value }) {
             setupBluetooth()
             loadPairedDevices()
-        }
-    }
-
-    private val connection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            val binder = service as MouseService.LocalBinder
-            mouseService = binder.getService()
-            isBound = true
-            autoConnect()
-        }
-
-        override fun onServiceDisconnected(name: ComponentName?) {
-            mouseService = null
-            isBound = false
         }
     }
 
@@ -145,8 +136,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        val serviceIntent = Intent(this, MouseService::class.java)
-        bindService(serviceIntent, connection, BIND_AUTO_CREATE)
+        autoConnect()
         
         val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
         registerReceiver(bluetoothReceiver, filter)
@@ -154,20 +144,48 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupAdapters() {
         pairedAdapter = DeviceAdapter(
-            onItemClick = { device -> connectToDevice(device) },
+            onItemClick = { device -> connectToDevice(device.address, device.name) },
             onInfoClick = { device -> showDeviceInfo(device) }
         )
         availableAdapter = DeviceAdapter(
-            onItemClick = { device -> connectToDevice(device) },
+            onItemClick = { device -> connectToDevice(device.address, device.name) },
             onInfoClick = { device -> showDeviceInfo(device) }
         )
     }
 
-    private fun connectToDevice(device: DeviceItem) {
-        prefs.edit { putString("last_bt_device", device.address) }
-        mouseService?.connectToDevice(device.address)
+    @SuppressLint("MissingPermission")
+    private fun connectToDevice(deviceAddress: String, deviceName: String) {
+        prefs.edit { putString("last_bt_device", deviceAddress) }
         viewFlipper.displayedChild = 2 // Move to controller
-        updateStatusBar("Connecting to ${device.name}...")
+        updateStatusBar("Connecting to $deviceName...")
+
+        executor.execute {
+            val adapter = BluetoothAdapter.getDefaultAdapter() ?: return@execute
+            val device: BluetoothDevice = adapter.getRemoteDevice(deviceAddress)
+            
+            try {
+                disconnectInternal()
+                bluetoothSocket = device.createRfcommSocketToServiceRecord(SPP_UUID)
+                bluetoothSocket?.connect()
+                outputStream = bluetoothSocket?.outputStream
+                Log.d("MainActivity", "Connected to Bluetooth device: $deviceAddress")
+                runOnUiThread { updateStatusBar("Connected to $deviceName") }
+            } catch (e: IOException) {
+                Log.e("MainActivity", "Connection failed", e)
+                disconnectInternal()
+                runOnUiThread { updateStatusBar("Connection failed") }
+            }
+        }
+    }
+
+    private fun disconnectInternal() {
+        try {
+            bluetoothSocket?.close()
+        } catch (e: IOException) {
+            Log.e("MainActivity", "Error closing socket", e)
+        }
+        bluetoothSocket = null
+        outputStream = null
     }
 
     private fun checkPermissions() {
@@ -249,12 +267,10 @@ class MainActivity : AppCompatActivity() {
         findViewById<ImageButton>(R.id.btn_settings_info)?.setOnClickListener { viewFlipper.displayedChild = 4 }
     }
 
-    @SuppressLint("MissingPermission")
     private fun autoConnect() {
         val lastDevice = prefs.getString("last_bt_device", null)
         if (lastDevice != null) {
-            mouseService?.connectToDevice(lastDevice)
-            updateStatusBar("Connecting to device...")
+            connectToDevice(lastDevice, "Saved Device")
         } else {
             updateStatusBar("No device paired")
         }
@@ -434,7 +450,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendBluetoothCommand(cmd: String, value: String) {
-        mouseService?.sendCommand(cmd, value)
+        val message = "PMCMD:[$cmd]-{$value}\n"
+        executor.execute {
+            try {
+                outputStream?.write(message.toByteArray())
+                outputStream?.flush()
+            } catch (e: IOException) {
+                Log.e("MainActivity", "Failed to send command: $message", e)
+            }
+        }
     }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
@@ -466,6 +490,7 @@ class MainActivity : AppCompatActivity() {
         try {
             unregisterReceiver(bluetoothReceiver)
         } catch (e: Exception) {}
-        if (isBound) { unbindService(connection); isBound = false }
+        disconnectInternal()
+        executor.shutdown()
     }
 }

@@ -10,11 +10,11 @@ plugins {
 }
 
 android {
-  namespace = "com.example"
-  compileSdk { version = release(36) { minorApiLevel = 1 } }
+  namespace = "osa.phomouse"
+  compileSdk = 36
 
   defaultConfig {
-    applicationId = "com.aistudio.phomouse.vzxypn"
+    applicationId = "osa.phomouse"
     minSdk = 24
     targetSdk = 36
     versionCode = 1
