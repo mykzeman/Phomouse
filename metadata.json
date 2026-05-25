@@ -1,6 +1,0 @@
-{
-  "name": "Phomouse",
-  "description": "Adaptive Bluetooth Serial Mouse and Joystick Controller designed for personal accessibility and assistive controls.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
