@@ -33,4 +33,10 @@
     <string name="btn_double_click">Double Click</string>
     <string name="btn_scroll_up">Scroll Up</string>
     <string name="btn_scroll_down">Scroll Down</string>
+    <string name="header_device_info">DEVICE INFO</string>
+    <string name="label_device_name">Device Name</string>
+    <string name="label_status">Status</string>
+    <string name="label_address">Address</string>
+    <string name="btn_retry_connection">Retry\nConnection</string>
+    <string name="btn_forget_device">Forget Device</string>
 </resources>

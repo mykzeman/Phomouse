@@ -56,6 +56,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var pairedAdapter: DeviceAdapter
     private lateinit var availableAdapter: DeviceAdapter
     private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
+    
+    private var selectedDevice: DeviceItem? = null
 
     // Bluetooth serial communication members
     private val executor = Executors.newSingleThreadExecutor()
@@ -275,7 +277,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showDeviceInfo(device: DeviceItem) {
+        selectedDevice = device
         findViewById<TextView>(R.id.tv_info_device_name)?.text = device.name
+        findViewById<TextView>(R.id.tv_info_address)?.text = device.address
         findViewById<TextView>(R.id.tv_info_status)?.text = if (device.isPaired) "Paired" else "Available"
         viewFlipper.displayedChild = 3 // Info screen
     }
@@ -283,6 +287,44 @@ class MainActivity : AppCompatActivity() {
     private fun setupInfoScreen() {
         findViewById<ImageButton>(R.id.btn_home_info)?.setOnClickListener { viewFlipper.displayedChild = 0 }
         findViewById<ImageButton>(R.id.btn_settings_info)?.setOnClickListener { viewFlipper.displayedChild = 4 }
+
+        findViewById<View>(R.id.btn_retry)?.setOnClickListener {
+            selectedDevice?.let { device ->
+                connectToDevice(device.address, device.name)
+            }
+        }
+
+        findViewById<View>(R.id.btn_forget)?.setOnClickListener {
+            selectedDevice?.let { device ->
+                // Attempt to unpair (remove bond)
+                try {
+                    val btDevice = bluetoothAdapter?.getRemoteDevice(device.address)
+                    val method = btDevice?.javaClass?.getMethod("removeBond")
+                    method?.invoke(btDevice)
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Failed to remove bond", e)
+                }
+
+                // Clear from preferences if it was the last device
+                val lastDevice = prefs.getString("last_bt_device", null)
+                if (lastDevice == device.address) {
+                    prefs.edit { remove("last_bt_device") }
+                }
+                
+                // If it's the currently connected device, disconnect it
+                if (bluetoothSocket?.remoteDevice?.address == device.address) {
+                    disconnectInternal()
+                    updateStatusBar("Disconnected from ${device.name}")
+                }
+                
+                // Navigate back
+                viewFlipper.displayedChild = 0
+                // Refresh list
+                loadPairedDevices()
+                
+                android.widget.Toast.makeText(this, "Device forgotten", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun autoConnect() {
