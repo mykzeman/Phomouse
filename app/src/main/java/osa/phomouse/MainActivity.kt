@@ -50,7 +50,7 @@ class MainActivity : AppCompatActivity() {
     private val dwellHandler = Handler(Looper.getMainLooper())
     private var isJoystickMoving = false
     private val dwellRunnable = Runnable {
-        sendBluetoothCommand("LB", prefs.getInt("dwell_period", 500).toString())
+        sendBluetoothCommand("LB", prefs.getInt("dwell_period", 1000).toString())
     }
 
     private lateinit var pairedAdapter: DeviceAdapter
@@ -68,14 +68,22 @@ class MainActivity : AppCompatActivity() {
         override fun onReceive(context: Context, intent: Intent) {
             when(intent.action) {
                 BluetoothDevice.ACTION_FOUND -> {
-                    val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    }
                     device?.let {
-                        val name = it.name ?: "Unknown Device"
-                        val item = DeviceItem(name, it.address, false)
-                        val currentList = availableAdapter.currentList.toMutableList()
-                        if (currentList.none { d -> d.address == item.address }) {
-                            currentList.add(item)
-                            availableAdapter.submitList(currentList)
+                        val deviceClass = it.bluetoothClass?.majorDeviceClass
+                        if (deviceClass == android.bluetooth.BluetoothClass.Device.Major.COMPUTER) {
+                            val name = it.name ?: "Unknown Device"
+                            val item = DeviceItem(name, it.address, false)
+                            val currentList = availableAdapter.currentList.toMutableList()
+                            if (currentList.none { d -> d.address == item.address }) {
+                                currentList.add(item)
+                                availableAdapter.submitList(currentList)
+                            }
                         }
                     }
                 }
@@ -127,7 +135,10 @@ class MainActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 when (viewFlipper.displayedChild) {
-                    1, 2, 3, 4 -> viewFlipper.displayedChild = 0 
+                    1, 2, 3, 4 -> {
+                        viewFlipper.displayedChild = 0
+                        dwellHandler.removeCallbacks(dwellRunnable)
+                    }
                     0 -> {
                         isEnabled = false
                         onBackPressedDispatcher.onBackPressed()
@@ -218,7 +229,9 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("MissingPermission")
     private fun loadPairedDevices() {
         val pairedDevices = bluetoothAdapter?.bondedDevices ?: emptySet()
-        val devices = pairedDevices.map { DeviceItem(it.name ?: "Unknown", it.address, true) }
+        val devices = pairedDevices
+            .filter { it.bluetoothClass?.majorDeviceClass == android.bluetooth.BluetoothClass.Device.Major.COMPUTER }
+            .map { DeviceItem(it.name ?: "Unknown", it.address, true) }
         pairedAdapter.submitList(devices)
     }
 
@@ -238,6 +251,9 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("MissingPermission")
     private fun startDiscovery() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+            return
+        }
         if (bluetoothAdapter?.isDiscovering == true) {
             bluetoothAdapter.cancelDiscovery()
         }
@@ -251,7 +267,9 @@ class MainActivity : AppCompatActivity() {
             adapter = availableAdapter
         }
         findViewById<ImageButton>(R.id.btn_home_add)?.setOnClickListener { 
-            bluetoothAdapter?.cancelDiscovery()
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
+                bluetoothAdapter?.cancelDiscovery()
+            }
             viewFlipper.displayedChild = 0 
         }
     }
@@ -283,9 +301,11 @@ class MainActivity : AppCompatActivity() {
     private fun setupNavigation() {
         findViewById<ImageButton>(R.id.btn_home_controller)?.setOnClickListener { 
             viewFlipper.displayedChild = 0
+            dwellHandler.removeCallbacks(dwellRunnable)
         }
         findViewById<ImageButton>(R.id.btn_settings_controller)?.setOnClickListener { 
             viewFlipper.displayedChild = 4 
+            dwellHandler.removeCallbacks(dwellRunnable)
         }
         findViewById<ImageButton>(R.id.btn_back_settings)?.setOnClickListener { 
             viewFlipper.displayedChild = 2 // Return to controller
@@ -294,8 +314,8 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupControllerButtons() {
-        val dwellValue = { prefs.getInt("dwell_period", 500).toString() }
-        val scrollValue = { prefs.getInt("scroll_amount", 1).toString() }
+        val dwellValue = { prefs.getInt("dwell_period", 1000).toString() }
+        val scrollValue = { prefs.getInt("scroll_amount", 50).toString() }
         val sensitivityValue = { prefs.getInt("sensitivity", 50) }
 
         val btnLeft = findViewById<MaterialButton>(R.id.btn_left_click)
@@ -316,9 +336,8 @@ class MainActivity : AppCompatActivity() {
                         val dx = ((event.x - centerX) / centerX * 127).roundToInt().coerceIn(-127, 127)
                         val dy = ((event.y - centerY) / centerY * 127).roundToInt().coerceIn(-127, 127)
                         
-                        if (dx != 0 || dy != 0) {
-                            sendBluetoothCommand("MV", "$dx,$dy")
-                        }
+                        if (dx != 0) sendBluetoothCommand("MX", dx.toString())
+                        if (dy != 0) sendBluetoothCommand("MY", dy.toString())
                         true
                     }
                     MotionEvent.ACTION_UP -> {
@@ -369,18 +388,24 @@ class MainActivity : AppCompatActivity() {
             isDragging = !isDragging
             if (isDragging) {
                 sendBluetoothCommand("DS", sensitivityValue().toString())
-                btnGrab.text = "Rel."
+                btnGrab.setText(R.string.btn_release)
             } else {
                 sendBluetoothCommand("DR", "0")
-                btnGrab.text = "Grab"
+                btnGrab.setText(R.string.btn_grab)
             }
         }
 
-        // D-pad Movement: Disabled if joystick mode is active
+        // D-pad Movement: Now active and triggers dwell click
         val onDpadClick = { dx: Int, dy: Int ->
-            if (!prefs.getBoolean("joystick_enabled", true)) {
-                val step = (sensitivityValue() / 5).coerceAtLeast(1)
-                sendBluetoothCommand("MV", "${dx * step},${dy * step}")
+            val step = (sensitivityValue() / 5).coerceAtLeast(1)
+            if (dx != 0) sendBluetoothCommand("MX", (dx * step).toString())
+            if (dy != 0) sendBluetoothCommand("MY", (dy * step).toString())
+
+            // Dwell Click: Trigger LB click after dwell_period if no further input
+            dwellHandler.removeCallbacks(dwellRunnable)
+            val dwell = prefs.getInt("dwell_period", 1000).toLong()
+            if (dwell > 0) {
+                dwellHandler.postDelayed(dwellRunnable, dwell)
             }
         }
 
@@ -391,13 +416,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupSettings() {
+        // Help icon explanations
+        val helpTexts = mapOf(
+            R.id.help_dwell to "Dwell Period: The time (in seconds) the cursor must stay still before a click is triggered.",
+            R.id.help_scroll to "Scroll Amount: The number of units to scroll up or down.",
+            R.id.help_ui_scale to "UI Scale: Adjusts the size of the buttons and text.",
+            R.id.help_sensitivity to "Action Sensitivity: Adjusts movement speed and drag sensitivity."
+        )
+        helpTexts.forEach { (id, text) ->
+            findViewById<View>(id)?.setOnClickListener {
+                android.widget.Toast.makeText(this, text, android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+
         findViewById<EditText>(R.id.edit_dwell)?.apply {
-            setText(prefs.getInt("dwell_period", 500).toString())
-            addTextChangedListener(createWatcher("dwell_period", 500))
+            val dwellMs = prefs.getInt("dwell_period", 1000)
+            setText((dwellMs / 1000f).toString())
+            addTextChangedListener(createWatcher("dwell_period", 1000, true))
         }
         findViewById<EditText>(R.id.edit_scroll)?.apply {
-            setText(prefs.getInt("scroll_amount", 1).toString())
-            addTextChangedListener(createWatcher("scroll_amount", 1))
+            setText(prefs.getInt("scroll_amount", 50).toString())
+            addTextChangedListener(createWatcher("scroll_amount", 50))
         }
         findViewById<SwitchCompat>(R.id.switch_joystick)?.apply {
             isChecked = prefs.getBoolean("joystick_enabled", true)
@@ -428,6 +467,18 @@ class MainActivity : AppCompatActivity() {
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
             })
         }
+
+        findViewById<SeekBar>(R.id.seekbar_ui_scale)?.apply {
+            progress = prefs.getInt("ui_scale", 50)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: SeekBar?, p: Int, user: Boolean) { 
+                    prefs.edit { putInt("ui_scale", p) }
+                    // Scale logic would go here, for now just saving
+                }
+                override fun onStartTrackingTouch(sb: SeekBar?) {}
+                override fun onStopTrackingTouch(sb: SeekBar?) {}
+            })
+        }
     }
 
     private fun restartActivity() {
@@ -438,11 +489,16 @@ class MainActivity : AppCompatActivity() {
         overridePendingTransition(0, 0)
     }
 
-    private fun createWatcher(key: String, def: Int) = object : TextWatcher {
+    private fun createWatcher(key: String, def: Int, isDwell: Boolean = false) = object : TextWatcher {
         override fun afterTextChanged(s: Editable?) { 
             val text = s.toString()
             if (text.isNotEmpty()) {
-                prefs.edit { putInt(key, text.toIntOrNull() ?: def) }
+                if (isDwell) {
+                    val seconds = text.toFloatOrNull() ?: (def / 1000f)
+                    prefs.edit { putInt(key, (seconds * 1000).toInt()) }
+                } else {
+                    prefs.edit { putInt(key, text.toIntOrNull() ?: def) }
+                }
             }
         }
         override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
@@ -474,10 +530,11 @@ class MainActivity : AppCompatActivity() {
             if (dx != 0 || dy != 0) {
                 isJoystickMoving = true
                 dwellHandler.removeCallbacks(dwellRunnable)
-                sendBluetoothCommand("MV", "$dx,$dy")
+                if (dx != 0) sendBluetoothCommand("MX", dx.toString())
+                if (dy != 0) sendBluetoothCommand("MY", dy.toString())
             } else if (isJoystickMoving) {
                 isJoystickMoving = false
-                val dwell = prefs.getInt("dwell_period", 500).toLong()
+                val dwell = prefs.getInt("dwell_period", 1000).toLong()
                 if (dwell > 0) dwellHandler.postDelayed(dwellRunnable, dwell)
             }
             return true
@@ -489,7 +546,7 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         try {
             unregisterReceiver(bluetoothReceiver)
-        } catch (e: Exception) {}
+        } catch (_: Exception) {}
         disconnectInternal()
         executor.shutdown()
     }

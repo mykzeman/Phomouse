@@ -33,6 +33,7 @@
             android:exported="true"
             android:label="@string/app_name"
             android:configChanges="orientation|screenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.Phomouse">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

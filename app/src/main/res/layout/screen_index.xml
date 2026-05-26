@@ -19,14 +19,14 @@
             android:layout_width="60dp"
             android:layout_height="60dp"
             android:src="@drawable/ic_logo"
-            android:contentDescription="Logo"
+            android:contentDescription="@string/desc_logo"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="DEVICE\nSCREEN"
+            android:text="@string/header_index"
             android:textSize="32sp"
             android:textStyle="bold"
             android:textColor="@color/black"
@@ -41,7 +41,7 @@
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:src="@drawable/ic_settings"
-            android:contentDescription="Settings"
+            android:contentDescription="@string/desc_settings"
             android:background="?attr/selectableItemBackgroundBorderless"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -52,7 +52,7 @@
         android:id="@+id/title_paired"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Paired Devices"
+        android:text="@string/title_paired"
         android:textSize="28sp"
         android:textStyle="bold"
         android:textColor="@color/black"
@@ -87,9 +87,9 @@
         app:maxImageSize="48dp"
         android:backgroundTint="@color/primary"
         app:tint="@color/white"
-        android:contentDescription="Add Device"
+        android:contentDescription="@string/btn_add_device"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         app:shapeAppearanceOverlay="@style/ShapeAppearance.Phomouse.RoundedFAB"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

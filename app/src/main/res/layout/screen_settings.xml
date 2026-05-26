@@ -18,6 +18,7 @@
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:src="@drawable/ic_arrow_back"
+            android:contentDescription="@string/desc_back"
             android:background="?attr/selectableItemBackgroundBorderless"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -25,7 +26,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="SETTINGS"
+            android:text="@string/header_settings"
             android:textSize="32sp"
             android:textStyle="bold"
             android:textColor="@color/black"
@@ -39,6 +40,7 @@
             android:layout_width="60dp"
             android:layout_height="60dp"
             android:src="@drawable/ic_logo"
+            android:contentDescription="@string/desc_logo"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
@@ -54,6 +56,8 @@
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:fillViewport="true"
+        android:isScrollContainer="true"
         app:layout_constraintTop_toBottomOf="@id/divider_settings"
         app:layout_constraintBottom_toBottomOf="parent">
 
@@ -71,7 +75,7 @@
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="Joystick Mode"
+                    android:text="@string/label_joystick"
                     android:textSize="24sp"
                     android:textColor="@color/black"
                     android:fontFamily="?attr/mainFontFamily"
@@ -96,7 +100,7 @@
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="Dyslexic Mode"
+                    android:text="@string/label_dyslexic"
                     android:textSize="24sp"
                     android:textColor="@color/black"
                     android:fontFamily="?attr/mainFontFamily"
@@ -121,7 +125,7 @@
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="Colourblind Mode"
+                    android:text="@string/label_colourblind"
                     android:textSize="24sp"
                     android:textColor="@color/black"
                     android:fontFamily="?attr/mainFontFamily"
@@ -147,7 +151,7 @@
                     android:id="@+id/label_dwell"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="Dwell Period"
+                    android:text="@string/label_dwell"
                     android:textSize="24sp"
                     android:textColor="@color/black"
                     android:fontFamily="?attr/mainFontFamily"
@@ -161,10 +165,12 @@
                     android:layout_height="60dp"
                     android:background="@drawable/edit_text_border"
                     android:textCursorDrawable="@drawable/black_cursor"
-                    android:inputType="number"
+                    android:inputType="numberDecimal"
                     android:textAlignment="center"
                     android:textColor="@color/black"
                     android:layout_marginEnd="12dp"
+                    android:importantForAutofill="no"
+                    android:hint="@string/hint_dwell"
                     app:layout_constraintEnd_toStartOf="@id/help_dwell"
                     app:layout_constraintTop_toTopOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent"/>
@@ -173,6 +179,7 @@
                     android:layout_width="32dp"
                     android:layout_height="32dp"
                     android:src="@drawable/ic_help"
+                    android:contentDescription="@string/desc_help"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent"/>
@@ -187,7 +194,7 @@
                     android:id="@+id/label_scroll"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="Scroll Amount"
+                    android:text="@string/label_scroll"
                     android:textSize="24sp"
                     android:textColor="@color/black"
                     android:fontFamily="?attr/mainFontFamily"
@@ -205,6 +212,8 @@
                     android:textAlignment="center"
                     android:textColor="@color/black"
                     android:layout_marginEnd="12dp"
+                    android:importantForAutofill="no"
+                    android:hint="@string/hint_scroll"
                     app:layout_constraintEnd_toStartOf="@id/help_scroll"
                     app:layout_constraintTop_toTopOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent"/>
@@ -213,6 +222,7 @@
                     android:layout_width="32dp"
                     android:layout_height="32dp"
                     android:src="@drawable/ic_help"
+                    android:contentDescription="@string/desc_help"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent"/>
@@ -230,7 +240,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="UI Scale"
+                        android:text="@string/label_ui_scale"
                         android:textSize="24sp"
                         android:textColor="@color/black"
                         android:fontFamily="?attr/mainFontFamily"
@@ -241,6 +251,7 @@
                         android:layout_width="32dp"
                         android:layout_height="32dp"
                         android:src="@drawable/ic_help"
+                        android:contentDescription="@string/desc_help"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintTop_toTopOf="parent" />
                 </androidx.constraintlayout.widget.ConstraintLayout>
@@ -265,7 +276,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Action Sensitivity"
+                        android:text="@string/label_sensitivity"
                         android:textSize="24sp"
                         android:textColor="@color/black"
                         android:fontFamily="?attr/mainFontFamily"
@@ -276,6 +287,7 @@
                         android:layout_width="32dp"
                         android:layout_height="32dp"
                         android:src="@drawable/ic_help"
+                        android:contentDescription="@string/desc_help"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintTop_toTopOf="parent" />
                 </androidx.constraintlayout.widget.ConstraintLayout>

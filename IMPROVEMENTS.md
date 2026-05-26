@@ -26,11 +26,15 @@
 1. **Devices Screen (Home/Index):** The landing page of the application. It lists all currently paired devices.
     * Click on a device to open the **Controller Screen**.
     * Click the `i` icon to view device information (**Info Screen**).
-    * Click the `+` button to navigate to the **Add Device Screen**.
+    * Click the `+` button (located on the bottom left) to navigate to the **Add Device Screen**.
 2. **Add Device Screen:** Allows you to scan for and add a new device to be paired. (Requires Android Bluetooth permissions to be granted). Click on a discovered device to pair it. You can navigate back to the **Devices Screen** at any time to connect to an already paired device.
 3. **Controller Screen:** The main interface to control your PC.
     * **Prerequisite:** The target PC must have the Python script running and listening on the designated port (e.g., COM3).
     * **Features:** Contains all UI elements for left click, right click, middle click, scroll up/down, dragging, and the virtual Click Joystick.
     * **Navigation:** You can navigate to the **Home** or **Settings** screens from here. *Crucially, navigating away does not interrupt your active Bluetooth SPP connection.*
 4. **Info Screen:** Displays all relevant hardware and connection information about a selected device. You can navigate back to the **Devices Screen** or to the **Settings Screen** from here.
-5. **Settings Screen:** Contains the core configuration options (UI Scale, Dwell Period, Action Sensitivity, and Scroll Amount). Adjusting these updates `SharedPreferences`. You can navigate back to whatever screen you previously came from without interrupting the background Foreground Service connection.
+5. **Settings Screen:** Contains the core configuration options (UI Scale, Dwell Period, Action Sensitivity, and Scroll Amount).
+    * **Default Dwell:** 1.0 second.
+    * **Default Scroll:** 50 units.
+    * **Help System:** Each setting includes a `?` icon that displays a brief explanation via Toast when clicked.
+    * Adjusting these updates `SharedPreferences`. You can navigate back to whatever screen you previously came from without interrupting the background Foreground Service connection.
