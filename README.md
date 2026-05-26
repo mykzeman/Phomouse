@@ -1,6 +1,6 @@
 # Phomouse
 
-Phomouse is an open-source project designed to facilitate mouse control via a mobile application.
+Phomouse is an open-source project designed to facilitate mouse control via a mobile application for people with physical limitations who find standard computer mice difficult to use.
 
 ## Prerequisites
 
@@ -15,7 +15,7 @@ The script handles the serial/Bluetooth communication and executes mouse command
 ## Project Status
 
 - **Open Source:** This project is open source and available for modification.
-- **Experimental:** The current state of the app is **NOT** intended for real-world application. It is provided for educational and experimental purposes.
+- **Experimental:** The current state of the app is **NOT** intended for real-world application. It is provided for educational and experimental purposes as the cursor navigation still needs work.
 - **Ongoing Development:** I will continue making updates to the app, but please do not assume it will be "finished" or fully polished.
 
 ## Contributing
