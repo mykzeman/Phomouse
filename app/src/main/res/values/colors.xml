@@ -11,5 +11,6 @@
     <!--Neutral colors-->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="grey">#BDBDBD</color>
     <color name="ic_launcher_background">#FFFAFA</color>
 </resources>

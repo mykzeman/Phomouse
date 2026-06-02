@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Define a set of TextAppearances that use the custom font attribute -->
+    <style name="TextAppearance.Phomouse.DisplayLarge" parent="TextAppearance.Material3.DisplayLarge">
+        <item name="android:fontFamily">?attr/mainFontFamily</item>
+    </style>
+    <style name="TextAppearance.Phomouse.DisplayMedium" parent="TextAppearance.Material3.DisplayMedium">
+        <item name="android:fontFamily">?attr/mainFontFamily</item>
+    </style>
+    <style name="TextAppearance.Phomouse.DisplaySmall" parent="TextAppearance.Material3.DisplaySmall">
+        <item name="android:fontFamily">?attr/mainFontFamily</item>
+    </style>
+
+    <style name="TextAppearance.Phomouse.HeadlineLarge" parent="TextAppearance.Material3.HeadlineLarge">
+        <item name="android:fontFamily">?attr/mainFontFamily</item>
+    </style>
+    <style name="TextAppearance.Phomouse.HeadlineMedium" parent="TextAppearance.Material3.HeadlineMedium">
+        <item name="android:fontFamily">?attr/mainFontFamily</item>
+    </style>
+    <style name="TextAppearance.Phomouse.HeadlineSmall" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:fontFamily">?attr/mainFontFamily</item>
+    </style>
+
+    <style name="TextAppearance.Phomouse.TitleLarge" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:fontFamily">?attr/mainFontFamily</item>
+    </style>
+    <style name="TextAppearance.Phomouse.TitleMedium" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:fontFamily">?attr/mainFontFamily</item>
+    </style>
+    <style name="TextAppearance.Phomouse.TitleSmall" parent="TextAppearance.Material3.TitleSmall">
+        <item name="android:fontFamily">?attr/mainFontFamily</item>
+    </style>
+
+    <style name="TextAppearance.Phomouse.BodyLarge" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:fontFamily">?attr/mainFontFamily</item>
+    </style>
+    <style name="TextAppearance.Phomouse.BodyMedium" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:fontFamily">?attr/mainFontFamily</item>
+    </style>
+    <style name="TextAppearance.Phomouse.BodySmall" parent="TextAppearance.Material3.BodySmall">
+        <item name="android:fontFamily">?attr/mainFontFamily</item>
+    </style>
+
+    <style name="TextAppearance.Phomouse.LabelLarge" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:fontFamily">?attr/mainFontFamily</item>
+    </style>
+    <style name="TextAppearance.Phomouse.LabelMedium" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:fontFamily">?attr/mainFontFamily</item>
+    </style>
+    <style name="TextAppearance.Phomouse.LabelSmall" parent="TextAppearance.Material3.LabelSmall">
+        <item name="android:fontFamily">?attr/mainFontFamily</item>
+    </style>
+</resources>

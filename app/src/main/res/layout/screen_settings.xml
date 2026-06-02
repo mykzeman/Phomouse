@@ -30,7 +30,6 @@
             android:textSize="32sp"
             android:textStyle="bold"
             android:textColor="@color/black"
-            android:fontFamily="?attr/mainFontFamily"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -78,7 +77,6 @@
                     android:text="@string/label_joystick"
                     android:textSize="24sp"
                     android:textColor="@color/black"
-                    android:fontFamily="?attr/mainFontFamily"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toStartOf="@id/switch_joystick"
                     app:layout_constraintTop_toTopOf="parent"
@@ -87,6 +85,16 @@
                     android:id="@+id/switch_joystick"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginEnd="12dp"
+                    app:layout_constraintEnd_toStartOf="@id/help_joystick"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"/>
+                <ImageView
+                    android:id="@+id/help_joystick"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@drawable/ic_help"
+                    android:contentDescription="@string/desc_help"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintTop_toTopOf="parent"
                     app:layout_constraintBottom_toBottomOf="parent"/>
@@ -103,7 +111,6 @@
                     android:text="@string/label_dyslexic"
                     android:textSize="24sp"
                     android:textColor="@color/black"
-                    android:fontFamily="?attr/mainFontFamily"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toStartOf="@id/switch_dyslexic"
                     app:layout_constraintTop_toTopOf="parent"
@@ -128,7 +135,6 @@
                     android:text="@string/label_colourblind"
                     android:textSize="24sp"
                     android:textColor="@color/black"
-                    android:fontFamily="?attr/mainFontFamily"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toStartOf="@id/switch_colourblind"
                     app:layout_constraintTop_toTopOf="parent"
@@ -154,7 +160,6 @@
                     android:text="@string/label_dwell"
                     android:textSize="24sp"
                     android:textColor="@color/black"
-                    android:fontFamily="?attr/mainFontFamily"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toStartOf="@id/edit_dwell"
                     app:layout_constraintTop_toTopOf="parent"
@@ -197,7 +202,6 @@
                     android:text="@string/label_scroll"
                     android:textSize="24sp"
                     android:textColor="@color/black"
-                    android:fontFamily="?attr/mainFontFamily"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toStartOf="@id/edit_scroll"
                     app:layout_constraintTop_toTopOf="parent"
@@ -243,8 +247,7 @@
                         android:text="@string/label_ui_scale"
                         android:textSize="24sp"
                         android:textColor="@color/black"
-                        android:fontFamily="?attr/mainFontFamily"
-                        app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toTopOf="parent" />
                     <ImageView
                         android:id="@+id/help_ui_scale"
@@ -260,7 +263,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:progressDrawable="@color/primary"
+                    android:progressTint="@color/primary"
+                    android:progressBackgroundTint="@color/grey"
                     android:thumbTint="@color/primary" />
             </LinearLayout>
 
@@ -279,8 +283,7 @@
                         android:text="@string/label_sensitivity"
                         android:textSize="24sp"
                         android:textColor="@color/black"
-                        android:fontFamily="?attr/mainFontFamily"
-                        app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toTopOf="parent" />
                     <ImageView
                         android:id="@+id/help_sensitivity"
@@ -296,7 +299,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:progressDrawable="@color/primary"
+                    android:progressTint="@color/primary"
+                    android:progressBackgroundTint="@color/grey"
                     android:thumbTint="@color/primary" />
             </LinearLayout>
 

@@ -4,13 +4,36 @@
         <item name="colorPrimary">@color/primary</item>
         <item name="colorAccent">@color/accent</item>
         <item name="android:windowBackground">@color/white</item>
+
+        <!-- Custom font attribute -->
         <item name="mainFontFamily">@font/atkinson</item>
+
+        <!-- Apply font to all views -->
+        <item name="android:fontFamily">?attr/mainFontFamily</item>
+
+        <!-- Material 3 Typography -->
+        <item name="textAppearanceDisplayLarge">@style/TextAppearance.Phomouse.DisplayLarge</item>
+        <item name="textAppearanceDisplayMedium">@style/TextAppearance.Phomouse.DisplayMedium</item>
+        <item name="textAppearanceDisplaySmall">@style/TextAppearance.Phomouse.DisplaySmall</item>
+        <item name="textAppearanceHeadlineLarge">@style/TextAppearance.Phomouse.HeadlineLarge</item>
+        <item name="textAppearanceHeadlineMedium">@style/TextAppearance.Phomouse.HeadlineMedium</item>
+        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.Phomouse.HeadlineSmall</item>
+        <item name="textAppearanceTitleLarge">@style/TextAppearance.Phomouse.TitleLarge</item>
+        <item name="textAppearanceTitleMedium">@style/TextAppearance.Phomouse.TitleMedium</item>
+        <item name="textAppearanceTitleSmall">@style/TextAppearance.Phomouse.TitleSmall</item>
+        <item name="textAppearanceBodyLarge">@style/TextAppearance.Phomouse.BodyLarge</item>
+        <item name="textAppearanceBodyMedium">@style/TextAppearance.Phomouse.BodyMedium</item>
+        <item name="textAppearanceBodySmall">@style/TextAppearance.Phomouse.BodySmall</item>
+        <item name="textAppearanceLabelLarge">@style/TextAppearance.Phomouse.LabelLarge</item>
+        <item name="textAppearanceLabelMedium">@style/TextAppearance.Phomouse.LabelMedium</item>
+        <item name="textAppearanceLabelSmall">@style/TextAppearance.Phomouse.LabelSmall</item>
     </style>
 
     <style name="Theme.Phomouse" parent="Base.Theme.Phomouse" />
 
     <style name="Theme.Phomouse.Dyslexic" parent="Base.Theme.Phomouse">
         <item name="mainFontFamily">@font/cadman</item>
+        <item name="android:fontFamily">@font/cadman</item>
     </style>
 
     <style name="Theme.Phomouse.Colourblind" parent="Base.Theme.Phomouse">
@@ -20,6 +43,7 @@
 
     <style name="Theme.Phomouse.Dyslexic.Colourblind" parent="Theme.Phomouse.Colourblind">
         <item name="mainFontFamily">@font/cadman</item>
+        <item name="android:fontFamily">@font/cadman</item>
     </style>
 
     <style name="ShapeAppearance.Phomouse.RoundedFAB" parent="ShapeAppearance.Material3.MediumComponent">

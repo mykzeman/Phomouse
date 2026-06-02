@@ -48,6 +48,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var prefs: SharedPreferences
     
     private val dwellHandler = Handler(Looper.getMainLooper())
+    private val repeatHandler = Handler(Looper.getMainLooper())
     private var isJoystickMoving = false
     private val dwellRunnable = Runnable {
         sendBluetoothCommand("LB", prefs.getInt("dwell_period", 1000).toString())
@@ -127,6 +128,7 @@ class MainActivity : AppCompatActivity() {
         setupNavigation()
         setupControllerButtons()
         setupSettings()
+        refreshJoystickUI()
 
         // Default screen to Index (0)
         val targetScreen = intent.getIntExtra("target_screen", 0)
@@ -280,7 +282,18 @@ class MainActivity : AppCompatActivity() {
         selectedDevice = device
         findViewById<TextView>(R.id.tv_info_device_name)?.text = device.name
         findViewById<TextView>(R.id.tv_info_address)?.text = device.address
-        findViewById<TextView>(R.id.tv_info_status)?.text = if (device.isPaired) "Paired" else "Available"
+        
+        val statusTv = findViewById<TextView>(R.id.tv_info_status)
+        statusTv?.text = if (device.isPaired) "Paired" else "Available"
+        
+        if (device.isPaired && !prefs.getBoolean("colourblind_mode", false)) {
+            statusTv?.setTextColor(ContextCompat.getColor(this, R.color.success))
+        } else if (!device.isPaired) {
+            statusTv?.setTextColor(ContextCompat.getColor(this, R.color.error))
+        } else {
+            statusTv?.setTextColor(ContextCompat.getColor(this, R.color.black))
+        }
+        
         viewFlipper.displayedChild = 3 // Info screen
     }
 
@@ -437,24 +450,69 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // D-pad Movement: Now active and triggers dwell click
-        val onDpadClick = { dx: Int, dy: Int ->
-            val step = (sensitivityValue() / 5).coerceAtLeast(1)
-            if (dx != 0) sendBluetoothCommand("MX", (dx * step).toString())
-            if (dy != 0) sendBluetoothCommand("MY", (dy * step).toString())
+        // D-pad Movement: Now supports repeating and acceleration when held
+        setupDpadButton(R.id.btn_drag_up, 0, -1)
+        setupDpadButton(R.id.btn_drag_down, 0, 1)
+        setupDpadButton(R.id.btn_drag_left, -1, 0)
+        setupDpadButton(R.id.btn_drag_right, 1, 0)
+    }
 
-            // Dwell Click: Trigger LB click after dwell_period if no further input
-            dwellHandler.removeCallbacks(dwellRunnable)
-            val dwell = prefs.getInt("dwell_period", 1000).toLong()
-            if (dwell > 0) {
-                dwellHandler.postDelayed(dwellRunnable, dwell)
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupDpadButton(id: Int, dx: Int, dy: Int) {
+        findViewById<View>(id)?.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.isPressed = true
+                    startDpadRepeat(dx, dy)
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    v.isPressed = false
+                    stopDpadRepeat()
+                    v.performClick()
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    v.isPressed = false
+                    stopDpadRepeat()
+                    true
+                }
+                else -> false
             }
         }
+    }
 
-        findViewById<MaterialButton>(R.id.btn_drag_up)?.setOnClickListener { onDpadClick(0, -1) }
-        findViewById<MaterialButton>(R.id.btn_drag_down)?.setOnClickListener { onDpadClick(0, 1) }
-        findViewById<MaterialButton>(R.id.btn_drag_left)?.setOnClickListener { onDpadClick(-1, 0) }
-        findViewById<MaterialButton>(R.id.btn_drag_right)?.setOnClickListener { onDpadClick(1, 0) }
+    private fun startDpadRepeat(dx: Int, dy: Int) {
+        repeatHandler.removeCallbacksAndMessages(null)
+        val baseSensitivity = prefs.getInt("sensitivity", 50)
+        
+        val runnable = object : Runnable {
+            var currentStep = baseSensitivity.coerceAtLeast(5)
+
+            override fun run() {
+                if (dx != 0) sendBluetoothCommand("MX", (dx * currentStep).toString())
+                if (dy != 0) sendBluetoothCommand("MY", (dy * currentStep).toString())
+                
+                // Accelerate if held
+                if (currentStep < 127) {
+                    currentStep = (currentStep + 3).coerceAtMost(127)
+                }
+                repeatHandler.postDelayed(this, 30) // Fast repeat rate (approx 33Hz)
+            }
+        }
+        repeatHandler.post(runnable)
+        
+        // Clear dwell click while moving
+        dwellHandler.removeCallbacks(dwellRunnable)
+    }
+
+    private fun stopDpadRepeat() {
+        repeatHandler.removeCallbacksAndMessages(null)
+        // Trigger dwell click after release
+        val dwell = prefs.getInt("dwell_period", 1000).toLong()
+        if (dwell > 0) {
+            dwellHandler.postDelayed(dwellRunnable, dwell)
+        }
     }
 
     private fun setupSettings() {
@@ -463,7 +521,8 @@ class MainActivity : AppCompatActivity() {
             R.id.help_dwell to "Dwell Period: The time (in seconds) the cursor must stay still before a click is triggered.",
             R.id.help_scroll to "Scroll Amount: The number of units to scroll up or down.",
             R.id.help_ui_scale to "UI Scale: Adjusts the size of the buttons and text.",
-            R.id.help_sensitivity to "Action Sensitivity: Adjusts movement speed and drag sensitivity."
+            R.id.help_sensitivity to "Action Sensitivity: Adjusts movement speed and drag sensitivity.",
+            R.id.help_joystick to getString(R.string.help_joystick)
         )
         helpTexts.forEach { (id, text) ->
             findViewById<View>(id)?.setOnClickListener {
@@ -482,7 +541,10 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<SwitchCompat>(R.id.switch_joystick)?.apply {
             isChecked = prefs.getBoolean("joystick_enabled", true)
-            setOnCheckedChangeListener { _, checked -> prefs.edit { putBoolean("joystick_enabled", checked) } }
+            setOnCheckedChangeListener { _, checked -> 
+                prefs.edit { putBoolean("joystick_enabled", checked) }
+                refreshJoystickUI()
+            }
         }
         
         findViewById<SwitchCompat>(R.id.switch_dyslexic)?.apply {
@@ -520,6 +582,52 @@ class MainActivity : AppCompatActivity() {
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
             })
+        }
+    }
+
+    private fun refreshJoystickUI() {
+        val joystickEnabled = prefs.getBoolean("joystick_enabled", true)
+        val container = findViewById<android.widget.LinearLayout>(R.id.controller_button_container) ?: return
+        
+        val btnLeft = findViewById<View>(R.id.btn_left_click)
+        val rowClicks = findViewById<View>(R.id.row_clicks)
+        val rowScroll = findViewById<View>(R.id.row_scroll)
+        val dpadContainer = findViewById<View>(R.id.dpad_container)
+
+        // Clear and re-add in desired order
+        container.removeAllViews()
+
+        if (joystickEnabled) {
+            // Joystick Mode: D-pad at top
+            dpadContainer?.let { container.addView(it) }
+            rowScroll?.let { container.addView(it) }
+            rowClicks?.let { container.addView(it) }
+            btnLeft?.visibility = View.GONE
+        } else {
+            // Default Mode: Scroll -> Clicks -> Left Click -> D-pad
+            rowScroll?.let { container.addView(it) }
+            rowClicks?.let { container.addView(it) }
+            btnLeft?.let { 
+                it.visibility = View.VISIBLE
+                container.addView(it)
+            }
+            dpadContainer?.let { container.addView(it) }
+        }
+        
+        // Enlarge D-pad in Joystick Mode
+        val size = if (joystickEnabled) 90 else 60
+        val sizePx = (size * resources.displayMetrics.density).toInt()
+        
+        val dpadButtons = listOf(
+            R.id.btn_drag_up, R.id.btn_drag_down, R.id.btn_drag_left, R.id.btn_drag_right, R.id.btn_grab,
+            R.id.space1, R.id.space2, R.id.space3, R.id.space4
+        )
+        
+        dpadButtons.forEach { id ->
+            findViewById<View>(id)?.layoutParams = findViewById<View>(id)?.layoutParams?.apply {
+                width = sizePx
+                height = sizePx
+            }
         }
     }
 
@@ -565,9 +673,9 @@ class MainActivity : AppCompatActivity() {
         
         val isJoy = event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
         if (isJoy && event.action == MotionEvent.ACTION_MOVE) {
-            val sensitivity = (prefs.getInt("sensitivity", 50) + 10) / 60f
-            val dx = (event.getAxisValue(MotionEvent.AXIS_X) * 127 * sensitivity).roundToInt()
-            val dy = (event.getAxisValue(MotionEvent.AXIS_Y) * 127 * sensitivity).roundToInt()
+            val sensitivity = (prefs.getInt("sensitivity", 50) / 25f).coerceAtLeast(0.1f)
+            val dx = (event.getAxisValue(MotionEvent.AXIS_X) * 127 * sensitivity).roundToInt().coerceIn(-127, 127)
+            val dy = (event.getAxisValue(MotionEvent.AXIS_Y) * 127 * sensitivity).roundToInt().coerceIn(-127, 127)
             
             if (dx != 0 || dy != 0) {
                 isJoystickMoving = true
@@ -590,6 +698,7 @@ class MainActivity : AppCompatActivity() {
             unregisterReceiver(bluetoothReceiver)
         } catch (_: Exception) {}
         disconnectInternal()
+        repeatHandler.removeCallbacksAndMessages(null)
         executor.shutdown()
     }
 }
