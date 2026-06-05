@@ -11,6 +11,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -101,6 +102,24 @@ class MainActivity : AppCompatActivity() {
             setupBluetooth()
             loadPairedDevices()
         }
+    }
+
+    override fun attachBaseContext(newBase: Context) {
+        val prefs = newBase.getSharedPreferences("PhomousePrefs", MODE_PRIVATE)
+        val isDyslexic = prefs.getBoolean("dyslexic_mode", false)
+        val uiScaleProgress = prefs.getInt("ui_scale", 50)
+
+        // Base scale: Atkinson is 1.0, Cadman (Dyslexic) is 0.85
+        val baseScale = if (isDyslexic) 0.85f else 1.0f
+        // Multiplier: 0.5 to 1.5 based on seekbar (0-100)
+        val multiplier = 0.5f + (uiScaleProgress / 100.0f)
+        val finalScale = baseScale * multiplier
+
+        val configuration: Configuration = newBase.resources.configuration
+        configuration.fontScale = finalScale
+
+        val context = newBase.createConfigurationContext(configuration)
+        super.attachBaseContext(context)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -577,10 +596,11 @@ class MainActivity : AppCompatActivity() {
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, user: Boolean) { 
                     prefs.edit { putInt("ui_scale", p) }
-                    // Scale logic would go here, for now just saving
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
-                override fun onStopTrackingTouch(sb: SeekBar?) {}
+                override fun onStopTrackingTouch(sb: SeekBar?) {
+                    restartActivity()
+                }
             })
         }
     }
