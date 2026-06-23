@@ -8,6 +8,8 @@
     <string name="help_joystick">Joystick Mode: Moves the D-pad to the top and enlarges it for easier access, while removing the manual left click button. D-pad movement triggers an automatic click after the dwell period.</string>
     <string name="label_dyslexic">Dyslexic Mode</string>
     <string name="label_colourblind">Colourblind Mode</string>
+    <string name="label_no_acceleration">No Acceleration</string>
+    <string name="help_no_acceleration">No Acceleration: When enabled, the cursor moves at a constant speed while D-pad buttons are held, rather than speeding up over time.</string>
     <string name="header_controller">CONTROLLER</string>
     <string name="header_index">DEVICE\nSCREEN</string>
     <string name="title_paired">Paired Devices</string>

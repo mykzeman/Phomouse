@@ -59,6 +59,14 @@ android {
     viewBinding = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+    viewBinding {
+        isEnabled = true
+    }
+    dependenciesInfo {
+        includeInBundle = true
+        includeInApk = true
+    }
+    buildToolsVersion = "36.1.0"
 }
 
 tasks.register("downloadFonts") {

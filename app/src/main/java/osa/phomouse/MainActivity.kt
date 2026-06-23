@@ -148,6 +148,7 @@ class MainActivity : AppCompatActivity() {
         setupControllerButtons()
         setupSettings()
         refreshJoystickUI()
+        refreshIconScales()
 
         // Default screen to Index (0)
         val targetScreen = intent.getIntExtra("target_screen", 0)
@@ -482,6 +483,7 @@ class MainActivity : AppCompatActivity() {
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     v.isPressed = true
+                    v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                     startDpadRepeat(dx, dy)
                     true
                 }
@@ -504,6 +506,7 @@ class MainActivity : AppCompatActivity() {
     private fun startDpadRepeat(dx: Int, dy: Int) {
         repeatHandler.removeCallbacksAndMessages(null)
         val baseSensitivity = prefs.getInt("sensitivity", 50)
+        val noAcceleration = prefs.getBoolean("no_acceleration", false)
         
         val runnable = object : Runnable {
             var currentStep = baseSensitivity.coerceAtLeast(5)
@@ -512,8 +515,8 @@ class MainActivity : AppCompatActivity() {
                 if (dx != 0) sendBluetoothCommand("MX", (dx * currentStep).toString())
                 if (dy != 0) sendBluetoothCommand("MY", (dy * currentStep).toString())
                 
-                // Accelerate if held
-                if (currentStep < 127) {
+                // Accelerate if held, unless No Acceleration is enabled
+                if (!noAcceleration && currentStep < 127) {
                     currentStep = (currentStep + 3).coerceAtMost(127)
                 }
                 repeatHandler.postDelayed(this, 30) // Fast repeat rate (approx 33Hz)
@@ -541,7 +544,8 @@ class MainActivity : AppCompatActivity() {
             R.id.help_scroll to "Scroll Amount: The number of units to scroll up or down.",
             R.id.help_ui_scale to "UI Scale: Adjusts the size of the buttons and text.",
             R.id.help_sensitivity to "Action Sensitivity: Adjusts movement speed and drag sensitivity.",
-            R.id.help_joystick to getString(R.string.help_joystick)
+            R.id.help_joystick to getString(R.string.help_joystick),
+            R.id.help_no_acceleration to getString(R.string.help_no_acceleration)
         )
         helpTexts.forEach { (id, text) ->
             findViewById<View>(id)?.setOnClickListener {
@@ -563,6 +567,13 @@ class MainActivity : AppCompatActivity() {
             setOnCheckedChangeListener { _, checked -> 
                 prefs.edit { putBoolean("joystick_enabled", checked) }
                 refreshJoystickUI()
+            }
+        }
+
+        findViewById<SwitchCompat>(R.id.switch_no_acceleration)?.apply {
+            isChecked = prefs.getBoolean("no_acceleration", false)
+            setOnCheckedChangeListener { _, checked ->
+                prefs.edit { putBoolean("no_acceleration", checked) }
             }
         }
         
@@ -634,9 +645,11 @@ class MainActivity : AppCompatActivity() {
             dpadContainer?.let { container.addView(it) }
         }
         
-        // Enlarge D-pad in Joystick Mode
-        val size = if (joystickEnabled) 90 else 60
-        val sizePx = (size * resources.displayMetrics.density).toInt()
+        // Enlarge D-pad in Joystick Mode and apply UI Scale
+        val uiScaleProgress = prefs.getInt("ui_scale", 50)
+        val multiplier = 0.5f + (uiScaleProgress / 100.0f)
+        val baseSize = if (joystickEnabled) 90 else 60
+        val sizePx = (baseSize * resources.displayMetrics.density * multiplier).toInt()
         
         val dpadButtons = listOf(
             R.id.btn_drag_up, R.id.btn_drag_down, R.id.btn_drag_left, R.id.btn_drag_right, R.id.btn_grab,
@@ -647,6 +660,35 @@ class MainActivity : AppCompatActivity() {
             findViewById<View>(id)?.layoutParams = findViewById<View>(id)?.layoutParams?.apply {
                 width = sizePx
                 height = sizePx
+            }
+        }
+    }
+
+    private fun refreshIconScales() {
+        val uiScaleProgress = prefs.getInt("ui_scale", 50)
+        val multiplier = 0.5f + (uiScaleProgress / 100.0f)
+        
+        val icons = listOf(
+            R.id.help_joystick, R.id.help_dwell, R.id.help_scroll, 
+            R.id.help_ui_scale, R.id.help_sensitivity, R.id.help_no_acceleration,
+            R.id.logo_settings, R.id.logo_index, R.id.btn_settings_index,
+            R.id.btn_back_settings
+        )
+        
+        val baseSize32 = (32 * resources.displayMetrics.density).toInt()
+        val baseSize48 = (48 * resources.displayMetrics.density).toInt()
+        val baseSize60 = (60 * resources.displayMetrics.density).toInt()
+
+        icons.forEach { id ->
+            val view = findViewById<View>(id) ?: return@forEach
+            val base = when (id) {
+                R.id.logo_settings, R.id.logo_index -> baseSize60
+                R.id.btn_settings_index, R.id.btn_back_settings -> baseSize48
+                else -> baseSize32
+            }
+            view.layoutParams = view.layoutParams.apply {
+                width = (base * multiplier).toInt()
+                height = (base * multiplier).toInt()
             }
         }
     }
