@@ -1,4 +1,3 @@
-import java.net.URL
 import java.net.URI
 
 plugins {
@@ -59,9 +58,6 @@ android {
     viewBinding = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
-    viewBinding {
-        isEnabled = true
-    }
     dependenciesInfo {
         includeInBundle = true
         includeInApk = true
@@ -120,7 +116,7 @@ tasks.register("downloadFonts") {
                                 println("Successfully copied system font fallback to $name")
                                 copied = true
                                 break
-                            } catch (ex: Exception) {
+                            } catch (_: Exception) {
                                 // ignore
                             }
                         }
