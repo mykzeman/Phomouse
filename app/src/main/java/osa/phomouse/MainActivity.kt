@@ -148,7 +148,6 @@ class MainActivity : AppCompatActivity() {
         setupControllerButtons()
         setupSettings()
         refreshJoystickUI()
-        refreshIconScales()
 
         // Default screen to Index (0)
         val targetScreen = intent.getIntExtra("target_screen", 0)
@@ -175,6 +174,11 @@ class MainActivity : AppCompatActivity() {
         
         val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
         registerReceiver(bluetoothReceiver, filter)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshJoystickUI()
     }
 
     private fun setupAdapters() {
@@ -480,14 +484,15 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("ClickableViewAccessibility")
     private fun setupDpadButton(id: Int, dx: Int, dy: Int) {
         findViewById<View>(id)?.setOnTouchListener { v, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
+            // Use event.actionMasked for better compatibility with different input sources
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                     v.isPressed = true
                     v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                     startDpadRepeat(dx, dy)
                     true
                 }
-                MotionEvent.ACTION_UP -> {
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
                     v.isPressed = false
                     stopDpadRepeat()
                     v.performClick()
@@ -500,6 +505,10 @@ class MainActivity : AppCompatActivity() {
                 }
                 else -> false
             }
+        }
+        // Also ensure it works for standard clicks if touch is handled differently by mice
+        findViewById<View>(id)?.setOnClickListener {
+            // Usually handled by touch listener, but keep for accessibility
         }
     }
 
@@ -540,10 +549,10 @@ class MainActivity : AppCompatActivity() {
     private fun setupSettings() {
         // Help icon explanations
         val helpTexts = mapOf(
-            R.id.help_dwell to "Dwell Period: The time (in seconds) the cursor must stay still before a click is triggered.",
-            R.id.help_scroll to "Scroll Amount: The number of units to scroll up or down.",
-            R.id.help_ui_scale to "UI Scale: Adjusts the size of the buttons and text.",
-            R.id.help_sensitivity to "Action Sensitivity: Adjusts movement speed and drag sensitivity.",
+            R.id.help_dwell to "The time (in seconds) the cursor must stay still before a click is triggered.",
+            R.id.help_scroll to "The number of units to scroll up or down.",
+            R.id.help_ui_scale to "Adjusts the size of the buttons and text.",
+            R.id.help_sensitivity to "Adjusts movement speed and drag sensitivity.",
             R.id.help_joystick to getString(R.string.help_joystick),
             R.id.help_no_acceleration to getString(R.string.help_no_acceleration)
         )
@@ -616,8 +625,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun isMouseConnected(): Boolean {
+        val ids = InputDevice.getDeviceIds()
+        for (id in ids) {
+            val device = InputDevice.getDevice(id)
+            if (device?.sources?.and(InputDevice.SOURCE_MOUSE) == InputDevice.SOURCE_MOUSE) {
+                // Ignore the virtual mouse or the touchscreen itself if it reports as mouse
+                if (device.name != "Virtual Mouse" && !device.isVirtual) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
     private fun refreshJoystickUI() {
-        val joystickEnabled = prefs.getBoolean("joystick_enabled", true)
+        val mouseConnected = isMouseConnected()
+        // If mouse is connected, we force joystick mode behavior (D-pad at top, enlarged)
+        val joystickEnabled = prefs.getBoolean("joystick_enabled", true) || mouseConnected
         val container = findViewById<android.widget.LinearLayout>(R.id.controller_button_container) ?: return
         
         val btnLeft = findViewById<View>(R.id.btn_left_click)
@@ -630,7 +655,10 @@ class MainActivity : AppCompatActivity() {
 
         if (joystickEnabled) {
             // Joystick Mode: D-pad at top
-            dpadContainer?.let { container.addView(it) }
+            dpadContainer?.let { 
+                it.visibility = View.VISIBLE
+                container.addView(it) 
+            }
             rowScroll?.let { container.addView(it) }
             rowClicks?.let { container.addView(it) }
             btnLeft?.visibility = View.GONE
@@ -642,7 +670,10 @@ class MainActivity : AppCompatActivity() {
                 it.visibility = View.VISIBLE
                 container.addView(it)
             }
-            dpadContainer?.let { container.addView(it) }
+            dpadContainer?.let { 
+                it.visibility = View.VISIBLE
+                container.addView(it) 
+            }
         }
         
         // Enlarge D-pad in Joystick Mode and apply UI Scale
@@ -664,34 +695,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun refreshIconScales() {
-        val uiScaleProgress = prefs.getInt("ui_scale", 50)
-        val multiplier = 0.5f + (uiScaleProgress / 100.0f)
-        
-        val icons = listOf(
-            R.id.help_joystick, R.id.help_dwell, R.id.help_scroll, 
-            R.id.help_ui_scale, R.id.help_sensitivity, R.id.help_no_acceleration,
-            R.id.logo_settings, R.id.logo_index, R.id.btn_settings_index,
-            R.id.btn_back_settings
-        )
-        
-        val baseSize32 = (32 * resources.displayMetrics.density).toInt()
-        val baseSize48 = (48 * resources.displayMetrics.density).toInt()
-        val baseSize60 = (60 * resources.displayMetrics.density).toInt()
-
-        icons.forEach { id ->
-            val view = findViewById<View>(id) ?: return@forEach
-            val base = when (id) {
-                R.id.logo_settings, R.id.logo_index -> baseSize60
-                R.id.btn_settings_index, R.id.btn_back_settings -> baseSize48
-                else -> baseSize32
-            }
-            view.layoutParams = view.layoutParams.apply {
-                width = (base * multiplier).toInt()
-                height = (base * multiplier).toInt()
-            }
-        }
-    }
 
     private fun restartActivity() {
         val intent = intent
