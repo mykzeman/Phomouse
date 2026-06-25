@@ -1,30 +1,25 @@
-import serial as bt
-import serial.tools.list_ports
+from serial import *
+from serial.tools import list_ports
 import re
-import pyautogui as gui
 import time
+import phomouse as pm
 
-BAUD_RATE = 9000
 
-# Disable pyautogui failsafe so you can reach the edges of the screen
-gui.FAILSAFE = False
-# Reduce default delay for smoother movement
-gui.PAUSE = 0
-
+BAUD_RATE = 9600
 # Command set
 COMMANDS = ['[MX]', '[MY]', '[LB]', '[RB]', '[MB]', '[SU]', '[SD]', '[DS]', '[DR]']
 
 def find_available_ports():
     """Returns a list of all currently available COM ports."""
-    ports = serial.tools.list_ports.comports()
+    ports = list_ports.comports()
     available = []
     for p in ports:
         try:
             # Try to open the port to see if it's actually available
-            ser = bt.Serial(p.device, BAUD_RATE, timeout=0.1)
+            ser = Serial(p.device, BAUD_RATE, timeout=0.1)
             ser.close()
             available.append(p.device)
-        except (bt.SerialException, OSError):
+        except (SerialException, OSError):
             continue
     return available
 
@@ -44,7 +39,7 @@ def receive_data():
         print(f'Attempting to connect to {com}...')
 
         try:
-            with bt.Serial(com, BAUD_RATE, timeout=5) as ser:
+            with Serial(com, BAUD_RATE, timeout=5) as ser:
                 print(f'Connected to {com}! Listening for Phomouse commands...')
                 while True:
                     if ser.in_waiting > 0:
@@ -78,26 +73,31 @@ def process_data(data: str):
 
                     # Execute actions
                     if cmd == '[MX]':
-                        gui.moveRel(v, 0, _pause=False)
+                        pm.send_mouse_input(v, 0, 0, pm.MOUSEEVENTF_MOVE)
                     elif cmd == '[MY]':
-                        gui.moveRel(0, v, _pause=False)
+                        pm.send_mouse_input(0, v, 0, pm.MOUSEEVENTF_MOVE)
                     elif cmd == '[LB]':
-                        gui.click(button='left')
+                        pm.send_mouse_input(0, 0, 0, pm.MOUSEEVENTF_LEFTDOWN)
+                        pm.send_mouse_input(0, 0, 0, pm.MOUSEEVENTF_LEFTUP)
                     elif cmd == '[RB]':
-                        gui.click(button='right')
+                        pm.send_mouse_input(0, 0, 0, pm.MOUSEEVENTF_RIGHTDOWN)
+                        pm.send_mouse_input(0, 0, 0, pm.MOUSEEVENTF_RIGHTUP)
                     elif cmd == '[MB]':
-                        gui.click(button='middle')
+                        pm.send_mouse_input(0, 0, 0, pm.MOUSEEVENTF_MIDDLEDOWN)
+                        pm.send_mouse_input(0, 0, 0, pm.MOUSEEVENTF_MIDDLEUP)
                     elif cmd == '[SU]':
-                        gui.scroll(v)
+                        pm.send_mouse_input(0, 0, v, pm.MOUSEEVENTF_WHEEL)
                     elif cmd == '[SD]':
-                        gui.scroll(-v)
+                        pm.send_mouse_input(0, 0, -v, pm.MOUSEEVENTF_WHEEL)
                     elif cmd == '[DS]':
-                        gui.mouseDown(button='left')
+                        pm.send_mouse_input(0, 0, 0, pm.MOUSEEVENTF_LEFTDOWN)
                     elif cmd == '[DR]':
-                        gui.mouseUp(button='left')
+                        pm.send_mouse_input(0, 0, 0, pm.MOUSEEVENTF_LEFTUP)
 
     except Exception:
         pass
 
-if __name__ == '__main__':
+def main():
     receive_data()
+if __name__ == '__main__':
+    main() 
