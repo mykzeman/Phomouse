@@ -21,17 +21,12 @@
 #### 1. D-pad & Movement
 *   The D-pad allows for discrete directional movement.
 *   Each tap sends an `MX` or `MY` command based on the current **Action Sensitivity**.
-*   **Dwell Click:** After any movement finishes (button release or hardware joystick return to center), a timer starts based on the **Dwell Period**. When it expires, an `LB` command is sent automatically.
+*   **Dwell Click:** After any movement finishes (releasing a D-pad button), a timer starts based on the **Dwell Period**. When it expires, an `LB` command is sent automatically.
 
 #### 2. Joystick Mode
 *   Toggleable in Settings.
 *   **UI Layout:** Rearranges the controller screen to place the D-pad at the top and enlarges the buttons for easier access.
-*   **Behavior:** Designed for users who rely primarily on the D-pad or external hardware joysticks. The "Left Click" button is hidden to prevent accidental triggers, as the dwell timer handles clicking.
-
-#### 3. Hardware Interception
-*   `MainActivity.dispatchGenericMotionEvent` captures input from connected hardware (e.g., Bluetooth power chair joysticks).
-*   Translated real-time into `MX` and `MY` commands.
-*   Triggers the same **Dwell Click** logic as the D-pad.
+*   **Behavior:** Designed for users who rely primarily on the D-pad. The "Left Click" button is hidden to prevent accidental triggers, as the dwell timer handles clicking.
 
 ### Application Flow
 1.  **Devices Screen:** Lists paired devices and allows adding new ones via scanning.

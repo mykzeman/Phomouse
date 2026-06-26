@@ -19,7 +19,6 @@ import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.Log
-import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
 import android.widget.EditText
@@ -52,7 +51,6 @@ class MainActivity : AppCompatActivity() {
     
     private val dwellHandler = Handler(Looper.getMainLooper())
     private val repeatHandler = Handler(Looper.getMainLooper())
-    private var isJoystickMoving = false
     private val dwellRunnable = Runnable {
         sendBluetoothCommand("LB", prefs.getInt("dwell_period", 1000).toString())
     }
@@ -483,7 +481,8 @@ class MainActivity : AppCompatActivity() {
             R.id.help_dwell to "Wait time before auto-click.",
             R.id.help_scroll to "Scroll distance per click.",
             R.id.help_ui_scale to "Size of buttons/text.",
-            R.id.help_sensitivity to "Movement & drag speed."
+            R.id.help_sensitivity to "Movement & drag speed.",
+            R.id.help_joystick to getString(R.string.help_joystick)
         )
         helpTexts.forEach { (id, text) ->
             findViewById<View>(id)?.setOnClickListener {
@@ -499,6 +498,13 @@ class MainActivity : AppCompatActivity() {
         findViewById<EditText>(R.id.edit_scroll)?.apply {
             setText(prefs.getInt("scroll_amount", 50).toString())
             addTextChangedListener(createWatcher("scroll_amount", 50))
+        }
+        findViewById<SwitchCompat>(R.id.switch_joystick)?.apply {
+            isChecked = prefs.getBoolean("joystick_enabled", true)
+            setOnCheckedChangeListener { _, checked -> 
+                prefs.edit { putBoolean("joystick_enabled", checked) }
+                refreshJoystickUI()
+            }
         }
 
         findViewById<SwitchCompat>(R.id.switch_dyslexic)?.apply {
@@ -541,6 +547,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshJoystickUI() {
+        val joystickEnabled = prefs.getBoolean("joystick_enabled", true)
         val container = findViewById<android.widget.LinearLayout>(R.id.controller_button_container) ?: return
         
         val btnLeft = findViewById<View>(R.id.btn_left_click)
@@ -548,24 +555,36 @@ class MainActivity : AppCompatActivity() {
         val rowScroll = findViewById<View>(R.id.row_scroll)
         val dpadContainer = findViewById<View>(R.id.dpad_container)
 
-        // Clear and re-add in desired order: Scroll -> Clicks -> Left Click -> D-pad
+        // Clear and re-add in desired order
         container.removeAllViews()
 
-        rowScroll?.let { container.addView(it) }
-        rowClicks?.let { container.addView(it) }
-        btnLeft?.let { 
-            it.visibility = View.VISIBLE
-            container.addView(it)
-        }
-        dpadContainer?.let { 
-            it.visibility = View.VISIBLE
-            container.addView(it) 
+        if (joystickEnabled) {
+            // Joystick Mode: D-pad at top
+            dpadContainer?.let { 
+                it.visibility = View.VISIBLE
+                container.addView(it) 
+            }
+            rowScroll?.let { container.addView(it) }
+            rowClicks?.let { container.addView(it) }
+            btnLeft?.visibility = View.GONE
+        } else {
+            // Default Mode: Scroll -> Clicks -> Left Click -> D-pad
+            rowScroll?.let { container.addView(it) }
+            rowClicks?.let { container.addView(it) }
+            btnLeft?.let { 
+                it.visibility = View.VISIBLE
+                container.addView(it)
+            }
+            dpadContainer?.let { 
+                it.visibility = View.VISIBLE
+                container.addView(it) 
+            }
         }
         
-        // Apply UI Scale to D-pad buttons
+        // Enlarge D-pad in Joystick Mode and apply UI Scale
         val uiScaleProgress = prefs.getInt("ui_scale", 50)
         val multiplier = 0.5f + (uiScaleProgress / 100.0f)
-        val baseSize = 60
+        val baseSize = if (joystickEnabled) 90 else 60
         val sizePx = (baseSize * resources.displayMetrics.density * multiplier).toInt()
         
         val dpadButtons = listOf(
@@ -618,27 +637,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-        val isJoy = event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
-        if (isJoy && event.action == MotionEvent.ACTION_MOVE) {
-            val sensitivity = (prefs.getInt("sensitivity", 50) / 25f).coerceAtLeast(0.1f)
-            val dx = (event.getAxisValue(MotionEvent.AXIS_X) * 127 * sensitivity).roundToInt().coerceIn(-127, 127)
-            val dy = (event.getAxisValue(MotionEvent.AXIS_Y) * 127 * sensitivity).roundToInt().coerceIn(-127, 127)
-            
-            if (dx != 0 || dy != 0) {
-                isJoystickMoving = true
-                dwellHandler.removeCallbacks(dwellRunnable)
-                if (dx != 0) sendBluetoothCommand("MX", dx.toString())
-                if (dy != 0) sendBluetoothCommand("MY", dy.toString())
-            } else if (isJoystickMoving) {
-                isJoystickMoving = false
-                val dwell = prefs.getInt("dwell_period", 1000).toLong()
-                if (dwell > 0) dwellHandler.postDelayed(dwellRunnable, dwell)
-            }
-            return true
-        }
-        return super.dispatchGenericMotionEvent(event)
-    }
+
 
     override fun onDestroy() {
         super.onDestroy()

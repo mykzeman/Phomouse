@@ -4,6 +4,8 @@
     <string name="label_scroll">Scroll Amount</string>
     <string name="label_ui_scale">UI Scale</string>
     <string name="label_sensitivity">Action Sensitivity</string>
+    <string name="label_joystick">Joystick Mode</string>
+    <string name="help_joystick">Moves D-pad to top and enlarges buttons. Auto-click after movement.</string>
     <string name="label_dyslexic">Dyslexic Mode</string>
     <string name="label_colourblind">Colourblind Mode</string>
     <string name="header_controller">CONTROLLER</string>
