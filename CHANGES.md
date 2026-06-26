@@ -8,7 +8,7 @@
 - Created `agents.md` to define operational guidelines for AI assistants.
 
 ### Changes
-- Redesigned D-pad buttons to use `OnTouchListener` with a repeating task (30ms interval) for smooth, continuous movement.
+- Redesigned D-pad buttons to use both `setOnClickListener` (for discrete taps) and `setOnTouchListener` (for continuous movement) with a repeating task (30ms interval).
 - Forced a minimum floor of **25%** for Action Sensitivity to ensure the device remains usable at low settings.
 - Updated `refreshJoystickUI` to correctly handle layout transitions and dynamic scaling.
 - Rewrote `IMPROVEMENTS.md` to reflect the current Bluetooth SPP protocol and input strategies.
