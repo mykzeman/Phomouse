@@ -456,10 +456,7 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupDpadButton(id: Int, dx: Int, dy: Int) {
-        val btn = findViewById<View>(id)
-        btn?.setOnTouchListener(null)
-        btn?.isClickable = true
-        btn?.isFocusable = true
+        val btn = findViewById<MaterialButton>(id)
         btn?.setOnClickListener {
             val sensitivity = prefs.getInt("sensitivity", 50)
             if (dx != 0) sendBluetoothCommand("MX", (dx * sensitivity).toString())

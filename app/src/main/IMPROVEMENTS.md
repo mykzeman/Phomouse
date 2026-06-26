@@ -19,7 +19,7 @@
 ### Input Strategies
 
 #### 1. D-pad & Movement
-*   The D-pad allows for discrete directional movement.
+*   The D-pad allows for discrete directional movement using standard **MaterialButton** components for maximum reliability.
 *   Each tap sends an `MX` or `MY` command based on the current **Action Sensitivity**.
 *   **Dwell Click:** After any movement finishes (releasing a D-pad button), a timer starts based on the **Dwell Period**. When it expires, an `LB` command is sent automatically.
 
@@ -28,12 +28,6 @@
 *   **UI Layout:** Rearranges the controller screen to place the D-pad at the top and enlarges the buttons for easier access.
 *   **Behavior:** Designed for users who rely primarily on the D-pad. The "Left Click" button is hidden to prevent accidental triggers, as the dwell timer handles clicking.
 
-### Application Flow
-1.  **Devices Screen:** Lists paired devices and allows adding new ones via scanning.
-2.  **Controller Screen:** The primary interface for PC control. Features click buttons, scroll controls, and the D-pad.
-3.  **Settings Screen:**
-    *   **Dwell Period:** Adjusts the auto-click delay after movement.
-    *   **Action Sensitivity:** Adjusts movement speed and drag strength.
-    *   **UI Scale:** Scales buttons and text for accessibility.
-    *   **Joystick Mode:** Simplifies the layout for D-pad centric use.
-    *   **Accessibility Modes:** Includes high-contrast (Colourblind) and dyslexia-friendly (Atkinson/Cadman fonts) options.
+### Recent Fixes
+* **D-pad Reliability:** Fully redid the D-pad buttons to use `MaterialButton` instead of generic `View` references in code, ensuring `setOnClickListener` works consistently across all Android versions.
+* **Simplified Interaction:** Removed complex hardware interception to focus on a stable, touch-first D-pad experience.

@@ -1,30 +1,27 @@
-# Phomouse
+# Phomouse Project Updates
 
-Phomouse is an open-source project designed to facilitate mouse control via a mobile application for people with physical limitations who find standard computer mice difficult to use.
+This file documents the major changes made to the Phomouse Android application to improve accessibility and reliability.
 
-## Prerequisites
+## Recent Changes
 
-Before connecting the mobile app to your PC, you **must** run the Python interpreter script on your computer:
+### 1. D-pad Overhaul
+- **Fixed Non-Responsive Buttons:** Replaced the generic `View` handling for D-pad buttons with explicit `MaterialButton` implementations in `MainActivity.kt`.
+- **Consistent Event Handling:** Ensured `setOnClickListener` is the primary interaction method, removing conflicting `OnTouchListener` logic that was preventing clicks from registering.
+- **Dynamic UI Scaling:** Improved the `refreshJoystickUI` method to correctly scale D-pad buttons while maintaining their functionality.
 
-```bash
-python interpreter.py
-```
+### 2. Joystick Mode re-introduction
+- **Simplified Logic:** Re-added "Joystick Mode" but with a focus on D-pad centric usage.
+- **Layout Rearrangement:** When enabled, the D-pad moves to the top of the controller screen and its buttons are enlarged.
+- **Dwell-to-Click:** Integrated the dwell timer with D-pad movement. Stopping movement triggers an automatic left-click after the set dwell period.
 
-The script handles the serial/Bluetooth communication and executes mouse commands on your system.
+### 3. Removal of Complex Interception
+- **Removed Hardware Mouse Interception:** Cleared out the `dispatchGenericMotionEvent` logic that was causing instability and conflicting with touch controls.
+- **Unified Command Flow:** All commands now flow through a simplified, reliable interface.
 
-## Project Status
+### 4. Documentation Updates
+- **IMPROVEMENTS.md:** Updated to reflect the current SPP protocol, the new D-pad behavior, and the simplified Joystick Mode.
+- **README.md:** Created this file to track recent project-wide changes.
 
-- **Open Source:** This project is open source and available for modification.
-- **Experimental:** The current state of the app is **NOT** intended for real-world application. It is provided for educational and experimental purposes as the cursor navigation still needs work.
-- **Ongoing Development:** I will continue making updates to the app, but please do not assume it will be "finished" or fully polished.
-
-## Contributing
-
-We welcome forks and commits! To contribute to this project, please adhere to the following rules:
-
-1.  **Fork** the repository or clone it.
-2.  **Create a new branch** for your specific feature or fix.
-3.  Make your contributions within that branch.
-4.  Submit a **Pull Request** (PR) describing your changes.
-
-Happy coding!
+## Next Steps
+- Verify the Bluetooth connection stability with the updated command formatting.
+- Test the D-pad "Dwell Click" behavior in various latency environments.
