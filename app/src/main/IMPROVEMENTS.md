@@ -18,9 +18,10 @@
 
 ### Input Strategies
 
-#### 1. D-pad & Movement
-*   The D-pad allows for discrete directional movement using standard **MaterialButton** components for maximum reliability.
-*   Each tap sends an `MX` or `MY` command based on the current **Action Sensitivity**.
+#### 1. D-pad & Smooth Movement
+*   The D-pad allows for continuous, smooth directional movement using an **OnTouchListener**.
+*   When held, it sends frequent, small movement updates (every 20ms) for a fluid experience on the PC.
+*   **Action Sensitivity:** Now has a minimum floor of 25% to ensure movement is always detectable.
 *   **Dwell Click:** After any movement finishes (releasing a D-pad button), a timer starts based on the **Dwell Period**. When it expires, an `LB` command is sent automatically.
 
 #### 2. Joystick Mode
@@ -29,5 +30,5 @@
 *   **Behavior:** Designed for users who rely primarily on the D-pad. The "Left Click" button is hidden to prevent accidental triggers, as the dwell timer handles clicking.
 
 ### Recent Fixes
-* **D-pad Reliability:** Fully redid the D-pad buttons to use `MaterialButton` instead of generic `View` references in code, ensuring `setOnClickListener` works consistently across all Android versions.
-* **Simplified Interaction:** Removed complex hardware interception to focus on a stable, touch-first D-pad experience.
+* **Smooth Scrolling/Movement:** Transitioned from discrete click-based movement to touch-based repeating updates, eliminating jerkiness.
+* **Visual Feedback:** Added percentage indicators for Sensitivity and UI Scale settings.

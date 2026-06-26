@@ -4,24 +4,22 @@ This file documents the major changes made to the Phomouse Android application t
 
 ## Recent Changes
 
-### 1. D-pad Overhaul
-- **Fixed Non-Responsive Buttons:** Replaced the generic `View` handling for D-pad buttons with explicit `MaterialButton` implementations in `MainActivity.kt`.
-- **Consistent Event Handling:** Ensured `setOnClickListener` is the primary interaction method, removing conflicting `OnTouchListener` logic that was preventing clicks from registering.
-- **Dynamic UI Scaling:** Improved the `refreshJoystickUI` method to correctly scale D-pad buttons while maintaining their functionality.
+### 1. Movement Smoothing
+- **Anti-Jerk Logic:** Replaced the click-based D-pad movement with a high-frequency repeating task (50 updates per second). This ensures the cursor moves smoothly across the screen while the button is held, rather than in large, jerky jumps.
+- **Improved Touch Response:** Movement starts instantly on touch down and stops instantly on touch up, triggering the dwell click timer.
 
-### 2. Joystick Mode re-introduction
-- **Simplified Logic:** Re-added "Joystick Mode" but with a focus on D-pad centric usage.
-- **Layout Rearrangement:** When enabled, the D-pad moves to the top of the controller screen and its buttons are enlarged.
-- **Dwell-to-Click:** Integrated the dwell timer with D-pad movement. Stopping movement triggers an automatic left-click after the set dwell period.
+### 2. Sensitivity & UI Scale Enhancements
+- **Sensitivity Floor:** Implemented a minimum threshold of 25% for Action Sensitivity. This prevents the mouse from becoming unresponsively slow at the lowest seekbar settings.
+- **Visual Indicators:** Added real-time percentage text labels (`%`) to both the Action Sensitivity and UI Scale seekbars in the Settings screen, giving users precise feedback on their configurations.
 
-### 3. Removal of Complex Interception
-- **Removed Hardware Mouse Interception:** Cleared out the `dispatchGenericMotionEvent` logic that was causing instability and conflicting with touch controls.
-- **Unified Command Flow:** All commands now flow through a simplified, reliable interface.
+### 3. D-pad & Controller Fixes
+- **Functional Overhaul:** Redid the D-pad button logic using `OnTouchListener` to support continuous movement.
+- **Joystick Mode Stability:** Refined the layout rearrangement logic to ensure buttons maintain their enlarged state and smooth behavior when Joystick Mode is active.
 
-### 4. Documentation Updates
-- **IMPROVEMENTS.md:** Updated to reflect the current SPP protocol, the new D-pad behavior, and the simplified Joystick Mode.
-- **README.md:** Created this file to track recent project-wide changes.
+### 4. Documentation
+- **IMPROVEMENTS.md:** Updated to document the new smooth movement protocol and sensitivity minimums.
+- **README.md:** Updated with the latest fixes for jerkiness and visual feedback.
 
 ## Next Steps
-- Verify the Bluetooth connection stability with the updated command formatting.
-- Test the D-pad "Dwell Click" behavior in various latency environments.
+- Verify the 25% sensitivity floor provides sufficient control for all user types.
+- Monitor the Bluetooth buffer to ensure the high-frequency updates (20ms) do not cause lag on older PC hardware.
