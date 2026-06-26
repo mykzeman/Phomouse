@@ -1,36 +1,60 @@
-import serial as bt
+from serial import *
+from serial.tools import list_ports
 import re
-import pyautogui as gui
+import time
+# MAKE SURE TO INSTALL phomouse.py from the Phomouse repo in the same directory as this script
+import phomouse as pm
 
-COM_PORT = 'COM5'
-BAUD_RATE = 900
 
-# Disable pyautogui failsafe so you can reach the edges of the screen
-gui.FAILSAFE = False
-
-# We've split MV into MX (Move X) and MY (Move Y)
+BAUD_RATE = 9600
+# Command set
 COMMANDS = ['[MX]', '[MY]', '[LB]', '[RB]', '[MB]', '[SU]', '[SD]', '[DS]', '[DR]']
 
+def find_available_ports():
+    """Returns a list of all currently available COM ports."""
+    ports = list_ports.comports()
+    available = []
+    for p in ports:
+        try:
+            # Try to open the port to see if it's actually available
+            ser = Serial(p.device, BAUD_RATE, timeout=0.1)
+            ser.close()
+            available.append(p.device)
+        except (SerialException, OSError):
+            continue
+    return available
+
 def receive_data():
-    try:
-        # Added a timeout so the script doesn't lock up if the connection drops
-        with bt.Serial(COM_PORT, BAUD_RATE, timeout=0.1) as ser:
-            print(f"Successfully connected to {COM_PORT}! Listening for Phomouse...")
-            while True:
-                if ser.in_waiting > 0:
-                    data = ser.readline().decode('utf-8').strip()
-                    if data:
-                        process_data(data)
-    except Exception as e:
-        print(f"Serial connection failed for {COM_PORT}: {e}")
-        print("Troubleshooting steps:")
-        print("  1. Open Device Manager and confirm the COM port exists.")
-        print("  2. Make sure the phone or Bluetooth serial device is connected and powered on.")
-        print("  3. If the port number changed, update COM_PORT in the script.")
-        print("  4. Restart the app and try again.")
+    print('--- Phomouse Serial Interpreter ---')
+    print(f'Baud Rate: {BAUD_RATE}')
+    
+    while True:
+        available = find_available_ports()
+        if not available:
+            print('Searching for available COM ports...')
+            time.sleep(2)
+            continue
+
+        print(f'Detected available ports: {available}')
+        com = available[0]
+        print(f'Attempting to connect to {com}...')
+
+        try:
+            with Serial(com, BAUD_RATE, timeout=5) as ser:
+                print(f'Connected to {com}! Listening for Phomouse commands...')
+                while True:
+                    if ser.in_waiting > 0:
+                        data = ser.readline().decode('utf-8', errors='ignore').strip()
+                        if data:
+                            process_data(data)
+                    else:
+                        time.sleep(0.001) # Low latency loop
+        except Exception as e:
+            print(f'Connection lost or error on {com}: {e}')
+            time.sleep(1)
 
 def process_data(data: str):
-    # Expecting format like: "PMCMD:[MX]-10,PMCMD:[MY]--5,PMCMD:[LB]-0"
+    # Expecting format like: "PMCMD:[MX]-{22},PMCMD:[MY]-{5},PMCMD:[LB]-{1000}"
     try:
         values = data.split(',')
         for value in values:
@@ -38,50 +62,43 @@ def process_data(data: str):
                 match = re.match(r'PMCMD:(.*?)-(.*)', value)
                 if match:
                     cmd = match.group(1)
-                    val_str = match.group(2)
+                    val_str = match.group(2).strip('{}')
                     
                     if cmd not in COMMANDS:
-                        print(f"Warning: Unknown command '{cmd}'")
                         continue
                     
-                    # Convert value to integer safely
                     try:
-                        v=val_str[1:-1]
-                        v = int(v)
-                        print(f"Processing command '{cmd}' with value {v}")
+                        v = int(val_str)
                     except ValueError:
                         v = 0
-                        print(f"Warning: Invalid  value '{val_str}' for command '{cmd}', defaulting to 0")
-                    
-                    # Execute hardware actions instantly
+
+                    # Execute actions
                     if cmd == '[MX]':
-                        print(f"Moving mouse X by {v} pixels")
-                        gui.moveRel(v, 0)
+                        pm.send_mouse_input(v, 0, 0, pm.MOUSEEVENTF_MOVE)
                     elif cmd == '[MY]':
-                        print(f"Moving mouse Y by {v} pixels")
-                        gui.moveRel(0, v)
+                        pm.send_mouse_input(0, v, 0, pm.MOUSEEVENTF_MOVE)
                     elif cmd == '[LB]':
-                        gui.click(button='left') # Standard click
+                        pm.send_mouse_input(0, 0, 0, pm.MOUSEEVENTF_LEFTDOWN)
+                        pm.send_mouse_input(0, 0, 0, pm.MOUSEEVENTF_LEFTUP)
                     elif cmd == '[RB]':
-                        gui.click(button='right')
+                        pm.send_mouse_input(0, 0, 0, pm.MOUSEEVENTF_RIGHTDOWN)
+                        pm.send_mouse_input(0, 0, 0, pm.MOUSEEVENTF_RIGHTUP)
                     elif cmd == '[MB]':
-                        gui.click(button='middle')
+                        pm.send_mouse_input(0, 0, 0, pm.MOUSEEVENTF_MIDDLEDOWN)
+                        pm.send_mouse_input(0, 0, 0, pm.MOUSEEVENTF_MIDDLEUP)
                     elif cmd == '[SU]':
-                        gui.scroll(v)
+                        pm.send_mouse_input(0, 0, v, pm.MOUSEEVENTF_WHEEL)
                     elif cmd == '[SD]':
-                        gui.scroll(-v)
+                        pm.send_mouse_input(0, 0, -v, pm.MOUSEEVENTF_WHEEL)
                     elif cmd == '[DS]':
-                        gui.mouseDown(button='left') # Drag Start
+                        pm.send_mouse_input(0, 0, 0, pm.MOUSEEVENTF_LEFTDOWN)
                     elif cmd == '[DR]':
-                        gui.mouseUp(button='left')   # Drag Release
+                        pm.send_mouse_input(0, 0, 0, pm.MOUSEEVENTF_LEFTUP)
 
-            else:
-                # Silently ignore malformed packets to prevent crashing
-                pass
+    except Exception:
+        pass
 
-    except Exception as e:
-        # Catch errors but DO NOT crash the script. Real-time apps must keep running.
-        print(f"Error processing packet '{data}': {e}")
-
-if __name__ == '__main__':
+def main():
     receive_data()
+if __name__ == '__main__':
+    main() 

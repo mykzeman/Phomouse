@@ -92,11 +92,11 @@
                 android:orientation="horizontal"
                 android:layout_marginTop="8dp">
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_right_click"
+                    android:id="@+id/btn_double_click"
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="80dp"
-                    android:text="@string/btn_right_click"
+                    android:text="@string/btn_double_click"
                     android:textSize="16sp"
                     android:textColor="@color/black"
                     android:textAllCaps="false"
@@ -116,11 +116,11 @@
                     app:cornerRadius="12dp"
                     android:layout_marginHorizontal="4dp"/>
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_double_click"
+                    android:id="@+id/btn_right_click"
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="80dp"
-                    android:text="@string/btn_double_click"
+                    android:text="@string/btn_right_click"
                     android:textSize="16sp"
                     android:textColor="@color/black"
                     android:textAllCaps="false"

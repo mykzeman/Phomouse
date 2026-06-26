@@ -19,7 +19,6 @@ import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.Log
-import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
 import android.widget.EditText
@@ -34,6 +33,8 @@ import androidx.appcompat.widget.SwitchCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -50,7 +51,7 @@ class MainActivity : AppCompatActivity() {
     
     private val dwellHandler = Handler(Looper.getMainLooper())
     private val repeatHandler = Handler(Looper.getMainLooper())
-    private var isJoystickMoving = false
+    private var repeatRunnable: Runnable? = null
     private val dwellRunnable = Runnable {
         sendBluetoothCommand("LB", prefs.getInt("dwell_period", 1000).toString())
     }
@@ -103,6 +104,8 @@ class MainActivity : AppCompatActivity() {
             loadPairedDevices()
         }
     }
+
+    private var isDragging = false
 
     override fun attachBaseContext(newBase: Context) {
         val prefs = newBase.getSharedPreferences("PhomousePrefs", MODE_PRIVATE)
@@ -172,8 +175,24 @@ class MainActivity : AppCompatActivity() {
 
         autoConnect()
         
+        setupWindowInsets()
+
         val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
         registerReceiver(bluetoothReceiver, filter)
+    }
+
+    private fun setupWindowInsets() {
+        val root = findViewById<View>(R.id.screen_settings) ?: return
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, windowInsets ->
+            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, insets.bottom)
+            windowInsets
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshJoystickUI()
     }
 
     private fun setupAdapters() {
@@ -394,69 +413,29 @@ class MainActivity : AppCompatActivity() {
 
         val btnLeft = findViewById<MaterialButton>(R.id.btn_left_click)
         
-        // VIRTUAL JOYSTICK ON LEFT CLICK BUTTON
-        btnLeft?.setOnTouchListener { v, event ->
-            val joystickEnabled = prefs.getBoolean("joystick_enabled", true)
-            if (joystickEnabled) {
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        v.isPressed = true
-                        true
-                    }
-                    MotionEvent.ACTION_MOVE -> {
-                        val centerX = v.width / 2f
-                        val centerY = v.height / 2f
-                        // Map relative position to -127 to 127
-                        val dx = ((event.x - centerX) / centerX * 127).roundToInt().coerceIn(-127, 127)
-                        val dy = ((event.y - centerY) / centerY * 127).roundToInt().coerceIn(-127, 127)
-                        
-                        if (dx != 0) sendBluetoothCommand("MX", dx.toString())
-                        if (dy != 0) sendBluetoothCommand("MY", dy.toString())
-                        true
-                    }
-                    MotionEvent.ACTION_UP -> {
-                        v.isPressed = false
-                        // Trigger Left Click on Release as per IMPROVEMENTS.md
-                        sendBluetoothCommand("LB", dwellValue())
-                        v.performClick()
-                        true
-                    }
-                    MotionEvent.ACTION_CANCEL -> {
-                        v.isPressed = false
-                        true
-                    }
-                    else -> false
-                }
-            } else {
-                false
-            }
-        }
-
         btnLeft?.setOnClickListener {
-            // Only send command here if virtual joystick is DISABLED
-            if (!prefs.getBoolean("joystick_enabled", true)) {
-                sendBluetoothCommand("LB", dwellValue())
-            }
+            sendBluetoothCommand("LB", dwellValue())
         }
 
         findViewById<MaterialButton>(R.id.btn_right_click)?.setOnClickListener { 
-            sendBluetoothCommand("RB", dwellValue()) 
+            if (!isDragging) sendBluetoothCommand("RB", dwellValue()) 
         }
         findViewById<MaterialButton>(R.id.btn_middle_click)?.setOnClickListener { 
-            sendBluetoothCommand("MB", dwellValue()) 
+            if (!isDragging) sendBluetoothCommand("MB", dwellValue()) 
         }
         findViewById<MaterialButton>(R.id.btn_double_click)?.setOnClickListener {
-            sendBluetoothCommand("LB", "0")
-            it.postDelayed({ sendBluetoothCommand("LB", "0") }, 100)
+            if (!isDragging) {
+                sendBluetoothCommand("LB", "0")
+                it.postDelayed({ sendBluetoothCommand("LB", "0") }, 100)
+            }
         }
         findViewById<MaterialButton>(R.id.btn_scroll_up)?.setOnClickListener {
-            sendBluetoothCommand("SU", scrollValue())
+            if (!isDragging) sendBluetoothCommand("SU", scrollValue())
         }
         findViewById<MaterialButton>(R.id.btn_scroll_down)?.setOnClickListener {
-            sendBluetoothCommand("SD", scrollValue())
+            if (!isDragging) sendBluetoothCommand("SD", scrollValue())
         }
         
-        var isDragging = false
         val btnGrab = findViewById<MaterialButton>(R.id.btn_grab)
         btnGrab?.setOnClickListener {
             isDragging = !isDragging
@@ -478,22 +457,65 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupDpadButton(id: Int, dx: Int, dy: Int) {
-        findViewById<View>(id)?.setOnTouchListener { v, event ->
+        val btn = findViewById<MaterialButton>(id) ?: return
+        
+        // Single Click Fallback
+        btn.setOnClickListener {
+            val sensitivity = prefs.getInt("sensitivity", 50).coerceAtLeast(25)
+            if (dx != 0) sendBluetoothCommand("MX", (dx * sensitivity).toString())
+            if (dy != 0) sendBluetoothCommand("MY", (dy * sensitivity).toString())
+            
+            dwellHandler.removeCallbacks(dwellRunnable)
+            val dwell = prefs.getInt("dwell_period", 1000).toLong()
+            if (dwell > 0) {
+                dwellHandler.postDelayed(dwellRunnable, dwell)
+            }
+        }
+
+        // Continuous Movement
+        btn.setOnTouchListener { v, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     v.isPressed = true
-                    startDpadRepeat(dx, dy)
+                    dwellHandler.removeCallbacks(dwellRunnable)
+                    
+                    repeatRunnable?.let { repeatHandler.removeCallbacks(it) }
+                    
+                    repeatRunnable = object : Runnable {
+                        override fun run() {
+                            val sensitivity = prefs.getInt("sensitivity", 50).coerceAtLeast(25)
+                            val stepX = dx * (sensitivity / 10f)
+                            val stepY = dy * (sensitivity / 10f)
+                            
+                            if (dx != 0) sendBluetoothCommand("MX", stepX.toInt().toString())
+                            if (dy != 0) sendBluetoothCommand("MY", stepY.toInt().toString())
+                            
+                            repeatHandler.postDelayed(this, 30)
+                        }
+                    }
+                    repeatHandler.post(repeatRunnable!!)
                     true
                 }
                 MotionEvent.ACTION_UP -> {
                     v.isPressed = false
-                    stopDpadRepeat()
-                    v.performClick()
+                    repeatRunnable?.let { 
+                        repeatHandler.removeCallbacks(it)
+                        repeatRunnable = null
+                    }
+                    
+                    val dwell = prefs.getInt("dwell_period", 1000).toLong()
+                    if (dwell > 0) {
+                        dwellHandler.postDelayed(dwellRunnable, dwell)
+                    }
+                    v.performClick() // Trigger the onClickListener
                     true
                 }
                 MotionEvent.ACTION_CANCEL -> {
                     v.isPressed = false
-                    stopDpadRepeat()
+                    repeatRunnable?.let { 
+                        repeatHandler.removeCallbacks(it)
+                        repeatRunnable = null
+                    }
                     true
                 }
                 else -> false
@@ -501,46 +523,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun startDpadRepeat(dx: Int, dy: Int) {
-        repeatHandler.removeCallbacksAndMessages(null)
-        val baseSensitivity = prefs.getInt("sensitivity", 50)
-        
-        val runnable = object : Runnable {
-            var currentStep = baseSensitivity.coerceAtLeast(5)
-
-            override fun run() {
-                if (dx != 0) sendBluetoothCommand("MX", (dx * currentStep).toString())
-                if (dy != 0) sendBluetoothCommand("MY", (dy * currentStep).toString())
-                
-                // Accelerate if held
-                if (currentStep < 127) {
-                    currentStep = (currentStep + 3).coerceAtMost(127)
-                }
-                repeatHandler.postDelayed(this, 30) // Fast repeat rate (approx 33Hz)
-            }
-        }
-        repeatHandler.post(runnable)
-        
-        // Clear dwell click while moving
-        dwellHandler.removeCallbacks(dwellRunnable)
-    }
-
-    private fun stopDpadRepeat() {
-        repeatHandler.removeCallbacksAndMessages(null)
-        // Trigger dwell click after release
-        val dwell = prefs.getInt("dwell_period", 1000).toLong()
-        if (dwell > 0) {
-            dwellHandler.postDelayed(dwellRunnable, dwell)
-        }
-    }
 
     private fun setupSettings() {
         // Help icon explanations
         val helpTexts = mapOf(
-            R.id.help_dwell to "Dwell Period: The time (in seconds) the cursor must stay still before a click is triggered.",
-            R.id.help_scroll to "Scroll Amount: The number of units to scroll up or down.",
-            R.id.help_ui_scale to "UI Scale: Adjusts the size of the buttons and text.",
-            R.id.help_sensitivity to "Action Sensitivity: Adjusts movement speed and drag sensitivity.",
+            R.id.help_dwell to "Wait time before auto-click.",
+            R.id.help_scroll to "Scroll distance per click.",
+            R.id.help_ui_scale to "Size of buttons/text.",
+            R.id.help_sensitivity to "Movement & drag speed.",
             R.id.help_joystick to getString(R.string.help_joystick)
         )
         helpTexts.forEach { (id, text) ->
@@ -565,7 +555,7 @@ class MainActivity : AppCompatActivity() {
                 refreshJoystickUI()
             }
         }
-        
+
         findViewById<SwitchCompat>(R.id.switch_dyslexic)?.apply {
             isChecked = prefs.getBoolean("dyslexic_mode", false)
             setOnCheckedChangeListener { _, checked -> 
@@ -583,19 +573,32 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<SeekBar>(R.id.seekbar_sensitivity)?.apply {
-            progress = prefs.getInt("sensitivity", 50)
+            val currentSens = prefs.getInt("sensitivity", 50).coerceAtLeast(25)
+            progress = currentSens
+            val tvSens = findViewById<TextView>(R.id.tv_sensitivity_value)
+            tvSens?.text = "${currentSens}%"
+            
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(sb: SeekBar?, p: Int, user: Boolean) { prefs.edit { putInt("sensitivity", p) } }
+                override fun onProgressChanged(sb: SeekBar?, p: Int, user: Boolean) { 
+                    val actualVal = p.coerceAtLeast(25)
+                    tvSens?.text = "${actualVal}%"
+                    if (user) prefs.edit { putInt("sensitivity", actualVal) }
+                }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
             })
         }
 
         findViewById<SeekBar>(R.id.seekbar_ui_scale)?.apply {
-            progress = prefs.getInt("ui_scale", 50)
+            val currentScale = prefs.getInt("ui_scale", 50)
+            progress = currentScale
+            val tvScale = findViewById<TextView>(R.id.tv_ui_scale_value)
+            tvScale?.text = "${currentScale}%"
+            
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, user: Boolean) { 
-                    prefs.edit { putInt("ui_scale", p) }
+                    tvScale?.text = "${p}%"
+                    if (user) prefs.edit { putInt("ui_scale", p) }
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
                 override fun onStopTrackingTouch(sb: SeekBar?) {
@@ -619,7 +622,10 @@ class MainActivity : AppCompatActivity() {
 
         if (joystickEnabled) {
             // Joystick Mode: D-pad at top
-            dpadContainer?.let { container.addView(it) }
+            dpadContainer?.let { 
+                it.visibility = View.VISIBLE
+                container.addView(it) 
+            }
             rowScroll?.let { container.addView(it) }
             rowClicks?.let { container.addView(it) }
             btnLeft?.visibility = View.GONE
@@ -631,12 +637,17 @@ class MainActivity : AppCompatActivity() {
                 it.visibility = View.VISIBLE
                 container.addView(it)
             }
-            dpadContainer?.let { container.addView(it) }
+            dpadContainer?.let { 
+                it.visibility = View.VISIBLE
+                container.addView(it) 
+            }
         }
         
-        // Enlarge D-pad in Joystick Mode
-        val size = if (joystickEnabled) 90 else 60
-        val sizePx = (size * resources.displayMetrics.density).toInt()
+        // Enlarge D-pad in Joystick Mode and apply UI Scale
+        val uiScaleProgress = prefs.getInt("ui_scale", 50)
+        val multiplier = 0.5f + (uiScaleProgress / 100.0f)
+        val baseSize = if (joystickEnabled) 90 else 60
+        val sizePx = (baseSize * resources.displayMetrics.density * multiplier).toInt()
         
         val dpadButtons = listOf(
             R.id.btn_drag_up, R.id.btn_drag_down, R.id.btn_drag_left, R.id.btn_drag_right, R.id.btn_grab,
@@ -650,6 +661,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
 
     private fun restartActivity() {
         val intent = intent
@@ -687,30 +699,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-        // Physical joystick handling: Only active if Joystick Mode is enabled
-        if (!prefs.getBoolean("joystick_enabled", true)) return super.dispatchGenericMotionEvent(event)
-        
-        val isJoy = event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
-        if (isJoy && event.action == MotionEvent.ACTION_MOVE) {
-            val sensitivity = (prefs.getInt("sensitivity", 50) / 25f).coerceAtLeast(0.1f)
-            val dx = (event.getAxisValue(MotionEvent.AXIS_X) * 127 * sensitivity).roundToInt().coerceIn(-127, 127)
-            val dy = (event.getAxisValue(MotionEvent.AXIS_Y) * 127 * sensitivity).roundToInt().coerceIn(-127, 127)
-            
-            if (dx != 0 || dy != 0) {
-                isJoystickMoving = true
-                dwellHandler.removeCallbacks(dwellRunnable)
-                if (dx != 0) sendBluetoothCommand("MX", dx.toString())
-                if (dy != 0) sendBluetoothCommand("MY", dy.toString())
-            } else if (isJoystickMoving) {
-                isJoystickMoving = false
-                val dwell = prefs.getInt("dwell_period", 1000).toLong()
-                if (dwell > 0) dwellHandler.postDelayed(dwellRunnable, dwell)
-            }
-            return true
-        }
-        return super.dispatchGenericMotionEvent(event)
-    }
+
 
     override fun onDestroy() {
         super.onDestroy()

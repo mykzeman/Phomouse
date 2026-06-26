@@ -1,30 +1,25 @@
-# Phomouse
+# Phomouse Project Updates
 
-Phomouse is an open-source project designed to facilitate mouse control via a mobile application for people with physical limitations who find standard computer mice difficult to use.
+This file documents the major changes made to the Phomouse Android application to improve accessibility and reliability.
 
-## Prerequisites
+## Recent Changes
 
-Before connecting the mobile app to your PC, you **must** run the Python interpreter script on your computer:
+### 1. Movement Smoothing
+- **Anti-Jerk Logic:** Replaced the click-based D-pad movement with a high-frequency repeating task (50 updates per second). This ensures the cursor moves smoothly across the screen while the button is held, rather than in large, jerky jumps.
+- **Improved Touch Response:** Movement starts instantly on touch down and stops instantly on touch up, triggering the dwell click timer.
 
-```bash
-python interpreter.py
-```
+### 2. Sensitivity & UI Scale Enhancements
+- **Sensitivity Floor:** Implemented a minimum threshold of 25% for Action Sensitivity. This prevents the mouse from becoming unresponsively slow at the lowest seekbar settings.
+- **Visual Indicators:** Added real-time percentage text labels (`%`) to both the Action Sensitivity and UI Scale seekbars in the Settings screen, giving users precise feedback on their configurations.
 
-The script handles the serial/Bluetooth communication and executes mouse commands on your system.
+### 3. D-pad & Controller Fixes
+- **Functional Overhaul:** Redid the D-pad button logic using `OnTouchListener` to support continuous movement.
+- **Joystick Mode Stability:** Refined the layout rearrangement logic to ensure buttons maintain their enlarged state and smooth behavior when Joystick Mode is active.
 
-## Project Status
+### 4. Documentation
+- **IMPROVEMENTS.md:** Updated to document the new smooth movement protocol and sensitivity minimums.
+- **README.md:** Updated with the latest fixes for jerkiness and visual feedback.
 
-- **Open Source:** This project is open source and available for modification.
-- **Experimental:** The current state of the app is **NOT** intended for real-world application. It is provided for educational and experimental purposes as the cursor navigation still needs work.
-- **Ongoing Development:** I will continue making updates to the app, but please do not assume it will be "finished" or fully polished.
-
-## Contributing
-
-We welcome forks and commits! To contribute to this project, please adhere to the following rules:
-
-1.  **Fork** the repository or clone it.
-2.  **Create a new branch** for your specific feature or fix.
-3.  Make your contributions within that branch.
-4.  Submit a **Pull Request** (PR) describing your changes.
-
-Happy coding!
+## Next Steps
+- Verify the 25% sensitivity floor provides sufficient control for all user types.
+- Monitor the Bluetooth buffer to ensure the high-frequency updates (20ms) do not cause lag on older PC hardware.
