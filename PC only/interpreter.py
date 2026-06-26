@@ -2,6 +2,7 @@ from serial import *
 from serial.tools import list_ports
 import re
 import time
+# MAKE SURE TO INSTALL phomouse.py from the Phomouse repo in the same directory as this script
 import phomouse as pm
 
 

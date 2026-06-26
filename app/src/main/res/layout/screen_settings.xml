@@ -250,8 +250,19 @@
                         android:text="@string/label_ui_scale"
                         android:textSize="24sp"
                         android:textColor="@color/black"
-                            app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toTopOf="parent" />
+                    <TextView
+                        android:id="@+id/tv_ui_scale_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="50%"
+                        android:textSize="20sp"
+                        android:textColor="@color/black"
+                        android:layout_marginEnd="8dp"
+                        app:layout_constraintEnd_toStartOf="@id/help_ui_scale"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent"/>
                     <ImageView
                         android:id="@+id/help_ui_scale"
                         android:layout_width="32dp"
@@ -286,8 +297,19 @@
                         android:text="@string/label_sensitivity"
                         android:textSize="24sp"
                         android:textColor="@color/black"
-                            app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toTopOf="parent" />
+                    <TextView
+                        android:id="@+id/tv_sensitivity_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="50%"
+                        android:textSize="20sp"
+                        android:textColor="@color/black"
+                        android:layout_marginEnd="8dp"
+                        app:layout_constraintEnd_toStartOf="@id/help_sensitivity"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent"/>
                     <ImageView
                         android:id="@+id/help_sensitivity"
                         android:layout_width="32dp"

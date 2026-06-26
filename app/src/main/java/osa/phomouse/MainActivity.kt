@@ -51,6 +51,7 @@ class MainActivity : AppCompatActivity() {
     
     private val dwellHandler = Handler(Looper.getMainLooper())
     private val repeatHandler = Handler(Looper.getMainLooper())
+    private var repeatRunnable: Runnable? = null
     private val dwellRunnable = Runnable {
         sendBluetoothCommand("LB", prefs.getInt("dwell_period", 1000).toString())
     }
@@ -456,20 +457,68 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun setupDpadButton(id: Int, dx: Int, dy: Int) {
-        val btn = findViewById<View>(id)
-        btn?.setOnTouchListener(null)
-        btn?.isClickable = true
-        btn?.isFocusable = true
-        btn?.setOnClickListener {
-            val sensitivity = prefs.getInt("sensitivity", 50)
+        val btn = findViewById<MaterialButton>(id) ?: return
+        
+        // Single Click Fallback
+        btn.setOnClickListener {
+            val sensitivity = prefs.getInt("sensitivity", 50).coerceAtLeast(25)
             if (dx != 0) sendBluetoothCommand("MX", (dx * sensitivity).toString())
             if (dy != 0) sendBluetoothCommand("MY", (dy * sensitivity).toString())
             
-            // Trigger dwell click after a short delay to allow more movement
             dwellHandler.removeCallbacks(dwellRunnable)
             val dwell = prefs.getInt("dwell_period", 1000).toLong()
             if (dwell > 0) {
                 dwellHandler.postDelayed(dwellRunnable, dwell)
+            }
+        }
+
+        // Continuous Movement
+        btn.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.isPressed = true
+                    dwellHandler.removeCallbacks(dwellRunnable)
+                    
+                    repeatRunnable?.let { repeatHandler.removeCallbacks(it) }
+                    
+                    repeatRunnable = object : Runnable {
+                        override fun run() {
+                            val sensitivity = prefs.getInt("sensitivity", 50).coerceAtLeast(25)
+                            val stepX = dx * (sensitivity / 10f)
+                            val stepY = dy * (sensitivity / 10f)
+                            
+                            if (dx != 0) sendBluetoothCommand("MX", stepX.toInt().toString())
+                            if (dy != 0) sendBluetoothCommand("MY", stepY.toInt().toString())
+                            
+                            repeatHandler.postDelayed(this, 30)
+                        }
+                    }
+                    repeatHandler.post(repeatRunnable!!)
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    v.isPressed = false
+                    repeatRunnable?.let { 
+                        repeatHandler.removeCallbacks(it)
+                        repeatRunnable = null
+                    }
+                    
+                    val dwell = prefs.getInt("dwell_period", 1000).toLong()
+                    if (dwell > 0) {
+                        dwellHandler.postDelayed(dwellRunnable, dwell)
+                    }
+                    v.performClick() // Trigger the onClickListener
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    v.isPressed = false
+                    repeatRunnable?.let { 
+                        repeatHandler.removeCallbacks(it)
+                        repeatRunnable = null
+                    }
+                    true
+                }
+                else -> false
             }
         }
     }
@@ -524,19 +573,32 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<SeekBar>(R.id.seekbar_sensitivity)?.apply {
-            progress = prefs.getInt("sensitivity", 50)
+            val currentSens = prefs.getInt("sensitivity", 50).coerceAtLeast(25)
+            progress = currentSens
+            val tvSens = findViewById<TextView>(R.id.tv_sensitivity_value)
+            tvSens?.text = "${currentSens}%"
+            
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(sb: SeekBar?, p: Int, user: Boolean) { prefs.edit { putInt("sensitivity", p) } }
+                override fun onProgressChanged(sb: SeekBar?, p: Int, user: Boolean) { 
+                    val actualVal = p.coerceAtLeast(25)
+                    tvSens?.text = "${actualVal}%"
+                    if (user) prefs.edit { putInt("sensitivity", actualVal) }
+                }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
             })
         }
 
         findViewById<SeekBar>(R.id.seekbar_ui_scale)?.apply {
-            progress = prefs.getInt("ui_scale", 50)
+            val currentScale = prefs.getInt("ui_scale", 50)
+            progress = currentScale
+            val tvScale = findViewById<TextView>(R.id.tv_ui_scale_value)
+            tvScale?.text = "${currentScale}%"
+            
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(sb: SeekBar?, p: Int, user: Boolean) { 
-                    prefs.edit { putInt("ui_scale", p) }
+                    tvScale?.text = "${p}%"
+                    if (user) prefs.edit { putInt("ui_scale", p) }
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
                 override fun onStopTrackingTouch(sb: SeekBar?) {

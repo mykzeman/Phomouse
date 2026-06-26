@@ -1,3 +1,4 @@
+# Adapted from https://stackoverflow.com/questions/4263608/ctypes-mouse-events                      
 import ctypes as c
 import ctypes.wintypes as win
 import struct
